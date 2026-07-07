@@ -19,34 +19,49 @@ export default function AdminPage() {
   const [status, setStatus] = useState(null)
   const [result, setResult] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
-  const [mapsLoaded, setMapsLoaded] = useState(false)
+  const [mapsReady, setMapsReady] = useState(false)
   const [placeSelected, setPlaceSelected] = useState(false)
-  const autocompleteContainerRef = useRef(null)
+  const containerRef = useRef(null)
 
   const slug = useCustomSlug ? customSlug : toSlug(clientName)
   const cardUrl = `https://${DOMAIN}/${slug}`
 
   useEffect(() => {
     if (!authed) return
-    if (window.google?.maps) { setMapsLoaded(true); return }
-    const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&loading=async&libraries=places&v=weekly`
-    script.async = true
-    script.onload = () => setMapsLoaded(true)
-    document.head.appendChild(script)
+    if (window.google?.maps?.importLibrary) { setMapsReady(true); return }
+    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    ;((g) => {
+      var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window
+      b=b[c]||(b[c]={})
+      var d=b.maps||(b.maps={})
+      var r=new Set,e=new URLSearchParams
+      var u=()=>h||(h=new Promise(async(f,n)=>{
+        a=m.createElement("script")
+        e.set("libraries",[...r]+"")
+        for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k])
+        e.set("callback",c+".maps."+q)
+        a.src=`https://maps.${c}apis.com/maps/api/js?`+e
+        d[q]=f
+        a.onerror=()=>h=n(Error(p+" could not load."))
+        a.nonce=m.querySelector("script[nonce]")?.nonce||""
+        m.head.append(a)
+      }))
+      d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))
+    })({ key, v: "weekly" })
+    setMapsReady(true)
   }, [authed])
 
   useEffect(() => {
-    if (!mapsLoaded || !autocompleteContainerRef.current) return
+    if (!mapsReady || !containerRef.current) return
     ;(async () => {
       try {
         const { PlaceAutocompleteElement } = await window.google.maps.importLibrary('places')
-        autocompleteContainerRef.current.innerHTML = ''
-        const placeAuto = new PlaceAutocompleteElement()
-        placeAuto.style.width = '100%'
-        placeAuto.style.display = 'block'
-        autocompleteContainerRef.current.appendChild(placeAuto)
-        placeAuto.addEventListener('gmp-select', async (event) => {
+        containerRef.current.innerHTML = ''
+        const el = new PlaceAutocompleteElement()
+        el.style.width = '100%'
+        el.style.display = 'block'
+        containerRef.current.appendChild(el)
+        el.addEventListener('gmp-select', async (event) => {
           const place = event.placePrediction.toPlace()
           await place.fetchFields({ fields: ['displayName', 'id'] })
           setClientName(place.displayName || '')
@@ -54,9 +69,11 @@ export default function AdminPage() {
           setPlaceSelected(true)
           setUseCustomSlug(false)
         })
-      } catch (err) { console.error('Places init error:', err) }
+      } catch (err) {
+        console.error('Places error:', err)
+      }
     })()
-  }, [mapsLoaded])
+  }, [mapsReady])
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -73,8 +90,10 @@ export default function AdminPage() {
     if (res.ok) {
       setStatus('success'); setResult({ slug, cardUrl })
       setClientName(''); setGoogleUrl(''); setCustomSlug(''); setUseCustomSlug(false); setPlaceSelected(false)
-      if (autocompleteContainerRef.current) { const input = autocompleteContainerRef.current.querySelector('input'); if (input) input.value = '' }
-    } else { setStatus('error'); setErrorMsg(data.error || 'Something went wrong.') }
+      if (containerRef.current) { const input = containerRef.current.querySelector('input'); if (input) input.value = '' }
+    } else {
+      setStatus('error'); setErrorMsg(data.error || 'Something went wrong.')
+    }
   }
 
   function reset() { setStatus(null); setResult(null); setErrorMsg(''); setPlaceSelected(false) }
@@ -139,8 +158,7 @@ export default function AdminPage() {
       <hr style={s.divider} />
       <form onSubmit={handleSubmit}>
         <label style={s.label}>Search Business</label>
-        <div ref={autocompleteContainerRef} style={{ marginBottom: '8px' }} />
-        {!mapsLoaded && <input style={s.input} type="text" placeholder="Loading search..." disabled />}
+        <div ref={containerRef} style={{ marginBottom: '8px' }} />
         {placeSelected && <div style={s.confirmed}>✓ {clientName} — review link ready</div>}
         {slug && <>
           <div style={s.hint}>Card URL preview:</div>
