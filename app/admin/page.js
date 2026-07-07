@@ -28,27 +28,17 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!authed) return
-    if (window.google?.maps?.importLibrary) { setMapsReady(true); return }
-    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-    ;((g) => {
-      var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window
-      b=b[c]||(b[c]={})
-      var d=b.maps||(b.maps={})
-      var r=new Set,e=new URLSearchParams
-      var u=()=>h||(h=new Promise(async(f,n)=>{
-        a=m.createElement("script")
-        e.set("libraries",[...r]+"")
-        for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k])
-        e.set("callback",c+".maps."+q)
-        a.src=`https://maps.${c}apis.com/maps/api/js?`+e
-        d[q]=f
-        a.onerror=()=>h=n(Error(p+" could not load."))
-        a.nonce=m.querySelector("script[nonce]")?.nonce||""
-        m.head.append(a)
-      }))
-      d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))
-    })({ key, v: "weekly" })
-    setMapsReady(true)
+    if (window.__mapsLoaded) { setMapsReady(true); return }
+
+    window.__onMapsReady = () => {
+      window.__mapsLoaded = true
+      setMapsReady(true)
+    }
+
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&v=weekly&callback=__onMapsReady`
+    script.async = true
+    document.head.appendChild(script)
   }, [authed])
 
   useEffect(() => {
@@ -158,7 +148,7 @@ export default function AdminPage() {
       <hr style={s.divider} />
       <form onSubmit={handleSubmit}>
         <label style={s.label}>Search Business</label>
-        <div ref={containerRef} style={{ marginBottom: '8px' }} />
+        <div ref={containerRef} style={{ marginBottom: '8px', minHeight: '44px' }} />
         {placeSelected && <div style={s.confirmed}>✓ {clientName} — review link ready</div>}
         {slug && <>
           <div style={s.hint}>Card URL preview:</div>
