@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const DOMAIN = 'go.apextapcards.com'
 
@@ -20,12 +20,50 @@ export default function AdminPage() {
   const [googleUrl, setGoogleUrl] = useState('')
   const [customSlug, setCustomSlug] = useState('')
   const [useCustomSlug, setUseCustomSlug] = useState(false)
-  const [status, setStatus] = useState(null) // null | 'loading' | 'success' | 'error'
+  const [status, setStatus] = useState(null)
   const [result, setResult] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [mapsLoaded, setMapsLoaded] = useState(false)
+  const [placeSelected, setPlaceSelected] = useState(false)
+  const searchInputRef = useRef(null)
 
   const slug = useCustomSlug ? customSlug : toSlug(clientName)
   const cardUrl = `https://${DOMAIN}/${slug}`
+
+  // Load Google Maps script after login
+  useEffect(() => {
+    if (!authed) return
+    if (window.google?.maps?.places) {
+      setMapsLoaded(true)
+      return
+    }
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`
+    script.async = true
+    script.onload = () => setMapsLoaded(true)
+    document.head.appendChild(script)
+  }, [authed])
+
+  // Init Places Autocomplete once maps is loaded
+  useEffect(() => {
+    if (!mapsLoaded || !searchInputRef.current) return
+
+    const autocomplete = new window.google.maps.places.Autocomplete(
+      searchInputRef.current,
+      { types: ['establishment'] }
+    )
+
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace()
+      if (place?.place_id) {
+        const name = place.name || ''
+        setClientName(name)
+        setGoogleUrl(`https://search.google.com/local/writereview?placeid=${place.place_id}`)
+        setPlaceSelected(true)
+        setUseCustomSlug(false)
+      }
+    })
+  }, [mapsLoaded])
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -51,12 +89,7 @@ export default function AdminPage() {
     const res = await fetch('/api/add-client', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        slug,
-        client_name: clientName,
-        google_url: googleUrl,
-        password,
-      }),
+      body: JSON.stringify({ slug, client_name: clientName, google_url: googleUrl, password }),
     })
 
     const data = await res.json()
@@ -67,6 +100,8 @@ export default function AdminPage() {
       setGoogleUrl('')
       setCustomSlug('')
       setUseCustomSlug(false)
+      setPlaceSelected(false)
+      if (searchInputRef.current) searchInputRef.current.value = ''
     } else {
       setStatus('error')
       setErrorMsg(data.error || 'Something went wrong.')
@@ -134,6 +169,10 @@ export default function AdminPage() {
       marginBottom: '20px',
       transition: 'border-color 0.15s',
     },
+    inputSuccess: {
+      border: '1.5px solid #8C6937',
+      background: '#FDFAF5',
+    },
     preview: {
       background: '#F2ECE0',
       borderRadius: '8px',
@@ -155,7 +194,6 @@ export default function AdminPage() {
       fontSize: '15px',
       fontWeight: '600',
       cursor: 'pointer',
-      transition: 'opacity 0.15s',
     },
     btnDisabled: {
       opacity: 0.4,
@@ -165,6 +203,12 @@ export default function AdminPage() {
       color: '#c0392b',
       fontSize: '13px',
       marginBottom: '16px',
+    },
+    hint: {
+      fontSize: '12px',
+      color: '#6B7280',
+      marginBottom: '6px',
+      marginTop: '-14px',
     },
     success: {
       textAlign: 'center',
@@ -240,8 +284,16 @@ export default function AdminPage() {
       borderTop: '1px solid #E5DFD3',
       marginBottom: '24px',
     },
+    confirmed: {
+      fontSize: '12px',
+      color: '#8C6937',
+      fontWeight: '600',
+      marginTop: '-14px',
+      marginBottom: '20px',
+    },
   }
 
+  // Login screen
   if (!authed) {
     return (
       <div style={styles.page}>
@@ -259,15 +311,14 @@ export default function AdminPage() {
               autoFocus
             />
             {passwordError && <div style={styles.error}>{passwordError}</div>}
-            <button style={styles.btn} type="submit">
-              Sign In
-            </button>
+            <button style={styles.btn} type="submit">Sign In</button>
           </form>
         </div>
       </div>
     )
   }
 
+  // Success screen
   if (status === 'success' && result) {
     return (
       <div style={styles.page}>
@@ -281,17 +332,10 @@ export default function AdminPage() {
             <div style={styles.successSub}>Program each NFC card with this URL:</div>
             <div style={styles.urlLabel}>Card URL</div>
             <div style={styles.urlBox}>{result.cardUrl}</div>
-            <button
-              style={styles.copyBtn}
-              onClick={() => {
-                navigator.clipboard.writeText(result.cardUrl)
-              }}
-            >
+            <button style={styles.copyBtn} onClick={() => navigator.clipboard.writeText(result.cardUrl)}>
               Copy URL
             </button>
-            <button style={styles.anotherBtn} onClick={reset}>
-              Add Another Client
-            </button>
+            <button style={styles.anotherBtn} onClick={reset}>Add Another Client</button>
           </div>
         </div>
       </div>
@@ -307,34 +351,34 @@ export default function AdminPage() {
         <div style={styles.sub}>Admin — Add Client</div>
         <hr style={styles.divider} />
         <form onSubmit={handleSubmit}>
-          <label style={styles.label}>Client Business Name</label>
-          <input
-            style={styles.input}
-            type="text"
-            placeholder="e.g. Mario's Pizza"
-            value={clientName}
-            onChange={e => {
-              setClientName(e.target.value)
-              if (useCustomSlug) setCustomSlug(toSlug(e.target.value))
-            }}
-            autoFocus
-          />
 
-          {!useCustomSlug && slug && (
+          {/* Business Search */}
+          <label style={styles.label}>Search Business</label>
+          <input
+            ref={searchInputRef}
+            style={{ ...styles.input, ...(placeSelected ? styles.inputSuccess : {}) }}
+            type="text"
+            placeholder="Type business name..."
+            onChange={() => {
+              setPlaceSelected(false)
+              setClientName('')
+              setGoogleUrl('')
+            }}
+          />
+          {placeSelected && (
+            <div style={styles.confirmed}>✓ {clientName} — review link ready</div>
+          )}
+
+          {/* URL Slug */}
+          {slug && (
             <>
-              <div style={{ marginTop: '-14px', marginBottom: '6px', fontSize: '12px', color: '#6B7280' }}>
-                Card URL preview:
-              </div>
+              <div style={styles.hint}>Card URL preview:</div>
               <div style={styles.preview}>{DOMAIN}/{slug}</div>
-              <span
-                style={styles.toggleLink}
-                onClick={() => {
-                  setUseCustomSlug(true)
-                  setCustomSlug(slug)
-                }}
-              >
-                Edit URL slug
-              </span>
+              {!useCustomSlug && (
+                <span style={styles.toggleLink} onClick={() => { setUseCustomSlug(true); setCustomSlug(slug) }}>
+                  Edit URL slug
+                </span>
+              )}
             </>
           )}
 
@@ -352,19 +396,10 @@ export default function AdminPage() {
             </>
           )}
 
-          <label style={styles.label}>Google Review Link</label>
-          <input
-            style={styles.input}
-            type="url"
-            placeholder="https://g.page/r/..."
-            value={googleUrl}
-            onChange={e => setGoogleUrl(e.target.value)}
-          />
-
           {status === 'error' && <div style={styles.error}>{errorMsg}</div>}
 
           <button
-            style={{ ...styles.btn, ...(isReady && status !== 'loading' ? {} : styles.btnDisabled) }}
+            style={{ ...styles.btn, ...(!isReady || status === 'loading' ? styles.btnDisabled : {}) }}
             type="submit"
             disabled={!isReady || status === 'loading'}
           >

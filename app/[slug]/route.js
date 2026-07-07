@@ -15,6 +15,7 @@ export async function GET(request, { params }) {
     .eq('slug', slug)
     .single()
 
+  // If slug not found, send to main website
   if (error || !data) {
     redirect('https://apextapcards.com')
   }
