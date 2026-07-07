@@ -198,21 +198,33 @@ export default function AdminPage() {
 
         {placeSelected && <div style={s.confirmed}>✓ {clientName} — review link ready</div>}
 
-        {slug && <>
-          <div style={s.hint}>Card URL preview:</div>
-          <div style={s.preview}>{DOMAIN}/{slug}</div>
-          {!useCustomSlug && <span style={s.toggleLink} onClick={() => { setUseCustomSlug(true); setCustomSlug(slug) }}>Edit URL slug</span>}
-        </>}
+        {slug && (
+          <>
+            <div style={s.hint}>Card URL preview:</div>
+            <div style={s.preview}>{DOMAIN}/{slug}</div>
+            {!useCustomSlug && (
+              <span style={s.toggleLink} onClick={() => { setUseCustomSlug(true); setCustomSlug(slug) }}>
+                Edit URL slug
+              </span>
+            )}
+          </>
+        )}
 
-        {useCustomSlug && <>
-          <label style={s.label}>URL Slug</label>
-          <input style={{ ...s.input, marginBottom: '8px' }} type="text" placeholder="marios-pizza" value={customSlug} onChange={e => setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} />
-          <div style={s.preview}>{DOMAIN}/{customSlug || '...'}</div>
-        </>}
+        {useCustomSlug && (
+          <>
+            <label style={s.label}>URL Slug</label>
+            <input style={{ ...s.input, marginBottom: '8px' }} type="text" placeholder="marios-pizza" value={customSlug} onChange={e => setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} />
+            <div style={s.preview}>{DOMAIN}/{customSlug || '...'}</div>
+          </>
+        )}
 
         {status === 'error' && <div style={s.error}>{errorMsg}</div>}
 
-        <button style={{ ...s.btn, ...(!isReady || status === 'loading' ? s.btnDisabled : {}) }} type="submit" disabled={!isReady || status === 'loading'}>
+        <button
+          style={{ ...s.btn, ...(!isReady || status === 'loading' ? s.btnDisabled : {}) }}
+          type="submit"
+          disabled={!isReady || status === 'loading'}
+        >
           {status === 'loading' ? 'Adding...' : 'Add Client'}
         </button>
       </form>
