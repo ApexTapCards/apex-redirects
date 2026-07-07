@@ -1,13 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
-
 export async function GET(request, { params }) {
   const { slug } = await params
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  )
 
   const { data, error } = await supabase
     .from('redirects')
@@ -15,7 +15,6 @@ export async function GET(request, { params }) {
     .eq('slug', slug)
     .single()
 
-  // If slug not found, send to main website
   if (error || !data) {
     redirect('https://apextapcards.com')
   }
