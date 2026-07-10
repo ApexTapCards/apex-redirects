@@ -1,32 +1,46 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
-export async function POST(request) {
-  const { place_id, business_name, visited_by, outcome, password } = await request.json()
-
-  if (password !== process.env.ADMIN_PASSWORD) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  if (!place_id || !business_name || !visited_by || !outcome) {
-    return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 })
-  }
+export async function GET(request) {
+  const { searchParams } = new URL(request.url)
+  const placeId = searchParams.get('placeId')
+  const businessName = searchParams.get('businessName')
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
   )
 
-  const { error } = await supabase.from('pitches').insert([{
-    place_id,
-    business_name,
-    visited_by,
-    outcome,
-  }])
+  // Check if already a client — by name OR by computed slug
+  if (businessName) {
+    const computedSlug = businessName
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const { data: clients } = await supabase
+      .from('redirects')
+      .select('client_name, slug')
+      .or(`client_name.ilike.${businessName},slug.eq.${computedSlug}`)
+
+    if (clients && clients.length > 0) {
+      return NextResponse.json({ status: 'client', client: clients[0] })
+    }
   }
 
-  return NextResponse.json({ ok: true })
+  // Check pitch history
+  if (placeId) {
+    const { data: pitches } = await supabase
+      .from('pitches')
+      .select('visited_by, outcome, visited_at')
+      .eq('place_id', placeId)
+      .order('visited_at', { ascending: false })
+
+    if (pitches && pitches.length > 0) {
+      return NextResponse.json({ status: 'pitched', pitches })
+    }
+  }
+
+  return NextResponse.json({ status: 'new' })
 }
