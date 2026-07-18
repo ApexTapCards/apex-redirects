@@ -91,11 +91,11 @@ export default function AdminPage() {
     debounceRef.current = setTimeout(() => fetchSuggestions(val), 300)
   }
 
-  async function checkPitch(placeId, businessName) {
+  async function checkPitch(placeId, businessName, slug) {
     setPitchStatus('checking')
     try {
       const res = await fetch(
-        `/api/check-pitch?placeId=${encodeURIComponent(placeId)}&businessName=${encodeURIComponent(businessName)}`
+        `/api/check-pitch?placeId=${encodeURIComponent(placeId)}&businessName=${encodeURIComponent(businessName)}&slug=${encodeURIComponent(slug)}`
       )
       const data = await res.json()
       setPitchStatus(data.status)
@@ -111,6 +111,7 @@ export default function AdminPage() {
     const name = pred?.structuredFormat?.mainText?.text || pred?.text?.text || ''
     const placeId = pred?.placeId || ''
     const city = extractCity(pred?.structuredFormat?.secondaryText?.text || '')
+    const fullSlug = city ? toSlug(name) + '-' + toSlug(city) : toSlug(name)
     setClientName(name)
     setLocation(city)
     setGoogleUrl(`https://search.google.com/local/writereview?placeid=${placeId}`)
@@ -123,7 +124,7 @@ export default function AdminPage() {
     setPitchHistory([])
     setLogStatus(null)
     setVisitOutcome('')
-    checkPitch(placeId, name)
+    checkPitch(placeId, name, fullSlug)
   }
 
   async function handleLogVisit() {
