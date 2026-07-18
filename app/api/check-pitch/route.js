@@ -5,24 +5,19 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const placeId = searchParams.get('placeId')
   const businessName = searchParams.get('businessName')
+  const passedSlug = searchParams.get('slug')
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
   )
 
-  // Check if already a client — by name OR by computed slug
-  if (businessName) {
-    const computedSlug = businessName
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .trim()
-      .replace(/\s+/g, '-')
-
+  // Check if already a client — by the full location-specific slug
+  if (passedSlug) {
     const { data: clients } = await supabase
       .from('redirects')
       .select('client_name, slug')
-      .or(`client_name.ilike.${businessName},slug.eq.${computedSlug}`)
+      .eq('slug', passedSlug)
 
     if (clients && clients.length > 0) {
       return NextResponse.json({ status: 'client', client: clients[0] })
