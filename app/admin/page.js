@@ -11,54 +11,66 @@ const OUTCOMES = {
   sold: 'Sold',
 }
 
-function toSlug(name) {
-  return name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-')
+function toSlug(str) {
+  return str.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-')
 }
 
-function extractCity(secondaryText) {
-  if (!secondaryText) return ''
-  const parts = secondaryText.split(', ')
-  // Format: [Street], City, Province, Country — city is 3rd from end
-  if (parts.length >= 3) return parts[parts.length - 3]
-  return parts[0] || ''
+// Extract city from full Google Places text e.g. "Salutes, Val Caron, ON, Canada"
+function extractCity(fullText, businessName) {
+  let text = fullText || ''
+  // Strip the business name from the front
+  if (businessName && text.toLowerCase().startsWith(businessName.toLowerCase())) {
+    text = text.slice(businessName.length).replace(/^[,\s]+/, '')
+  }
+  // text is now e.g. "Val Caron, ON, Canada" or "123 Main St, Val Caron, ON, Canada"
+  const parts = text.split(',').map(p => p.trim()).filter(Boolean)
+  // Find the province code (2 uppercase letters like "ON", "QC")
+  const provIdx = parts.findIndex(p => /^[A-Z]{2}(\s|$)/.test(p))
+  const limit = provIdx > 0 ? provIdx : parts.length
+  // Return first part that doesn't start with a digit (skip street numbers)
+  for (let i = 0; i < limit; i++) {
+    if (parts[i] && !/^\d/.test(parts[i])) return parts[i]
+  }
+  return ''
 }
 
 function formatDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })
+  return new Date(dateStr).toLocaleDateString('en-CA', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  })
 }
 
 export default function AdminPage() {
+  // Auth
   const [authed, setAuthed] = useState(false)
   const [password, setPassword] = useState('')
   const [passwordError, setPasswordError] = useState('')
 
-  const [clientName, setClientName] = useState('')
-  const [googleUrl, setGoogleUrl] = useState('')
-  const [currentPlaceId, setCurrentPlaceId] = useState('')
+  // Search
   const [query, setQuery] = useState('')
   const [suggestions, setSuggestions] = useState([])
   const [showDropdown, setShowDropdown] = useState(false)
   const [placeSelected, setPlaceSelected] = useState(false)
 
-  const [location, setLocation] = useState('')
-  const [customSlug, setCustomSlug] = useState('')
-  const [useCustomSlug, setUseCustomSlug] = useState(false)
+  // Selected business
+  const [clientName, setClientName] = useState('')
+  const [googleUrl, setGoogleUrl] = useState('')
+  const [placeId, setPlaceId] = useState('')
+  const [slug, setSlug] = useState('')
 
-  const [status, setStatus] = useState(null)
-  const [result, setResult] = useState(null)
-  const [errorMsg, setErrorMsg] = useState('')
-
+  // Pitch tracking
   const [pitchStatus, setPitchStatus] = useState(null)
   const [pitchHistory, setPitchHistory] = useState([])
   const [repName, setRepName] = useState('')
   const [visitOutcome, setVisitOutcome] = useState('')
   const [logStatus, setLogStatus] = useState(null)
 
-  const debounceRef = useRef(null)
+  // Add client
+  const [submitStatus, setSubmitStatus] = useState(null)
+  const [errorMsg, setErrorMsg] = useState('')
+  const [result, setResult] = useState(null)
 
-  const baseSlug = location.trim() ? toSlug(clientName) + '-' + toSlug(location) : toSlug(clientName)
-  const slug = useCustomSlug ? customSlug : baseSlug
-  const cardUrl = `https://${DOMAIN}/${slug}`
+  const debounceRef = useRef(null)
 
   async function fetchSuggestions(input) {
     if (input.length < 2) { setSuggestions([]); setShowDropdown(false); return }
@@ -82,27 +94,21 @@ export default function AdminPage() {
     const val = e.target.value
     setQuery(val)
     setPlaceSelected(false)
-    setClientName('')
-    setGoogleUrl('')
-    setPitchStatus(null)
-    setPitchHistory([])
-    setLogStatus(null)
+    setClientName(''); setGoogleUrl(''); setPlaceId(''); setSlug('')
+    setPitchStatus(null); setPitchHistory([]); setLogStatus(null)
+    setSubmitStatus(null); setErrorMsg('')
     clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => fetchSuggestions(val), 300)
   }
 
-  async function checkPitch(placeId, businessName) {
+  async function checkPitchHistory(id) {
     setPitchStatus('checking')
     try {
-      const res = await fetch(
-        `/api/check-pitch?placeId=${encodeURIComponent(placeId)}&businessName=${encodeURIComponent(businessName)}`
-      )
+      const res = await fetch(`/api/check-pitch?placeId=${encodeURIComponent(id)}`)
       const data = await res.json()
       setPitchStatus(data.status)
       if (data.pitches) setPitchHistory(data.pitches)
-      if (data.clients) setPitchHistory(data.clients)
-    } catch (err) {
-      console.error('Pitch check error:', err)
+    } catch {
       setPitchStatus('new')
     }
   }
@@ -110,22 +116,22 @@ export default function AdminPage() {
   function handleSelect(suggestion) {
     const pred = suggestion.placePrediction
     const name = pred?.structuredFormat?.mainText?.text || pred?.text?.text || ''
-    const placeId = pred?.placeId || ''
-    const city = extractCity(pred?.structuredFormat?.secondaryText?.text || '')
-    const fullSlug = city ? toSlug(name) + '-' + toSlug(city) : toSlug(name)
+    const id = pred?.placeId || ''
+    const fullText = pred?.text?.text || ''
+    const city = extractCity(fullText, name)
+    const autoSlug = city ? toSlug(name) + '-' + toSlug(city) : toSlug(name)
+
     setClientName(name)
-    setLocation(city)
-    setGoogleUrl(`https://search.google.com/local/writereview?placeid=${placeId}`)
+    setGoogleUrl(`https://search.google.com/local/writereview?placeid=${id}`)
+    setPlaceId(id)
+    setSlug(autoSlug)
     setQuery(name)
     setPlaceSelected(true)
     setSuggestions([])
     setShowDropdown(false)
-    setUseCustomSlug(false)
-    setCurrentPlaceId(placeId)
-    setPitchHistory([])
-    setLogStatus(null)
-    setVisitOutcome('')
-    checkPitch(placeId, name)
+    setPitchHistory([]); setLogStatus(null); setVisitOutcome('')
+    setSubmitStatus(null); setErrorMsg('')
+    checkPitchHistory(id)
   }
 
   async function handleLogVisit() {
@@ -136,7 +142,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          place_id: currentPlaceId,
+          place_id: placeId,
           business_name: clientName,
           visited_by: repName.trim(),
           outcome: visitOutcome,
@@ -145,19 +151,17 @@ export default function AdminPage() {
       })
       if (res.ok) {
         setLogStatus('logged')
-        const newRecord = {
+        setPitchHistory(prev => [{
           visited_by: repName.trim(),
           outcome: visitOutcome,
           visited_at: new Date().toISOString(),
-        }
-        setPitchHistory(prev => [newRecord, ...prev])
+        }, ...prev])
         if (pitchStatus === 'new') setPitchStatus('pitched')
       } else {
-        setLogStatus(null)
+        setLogStatus('error')
       }
-    } catch (err) {
-      console.error('Log visit error:', err)
-      setLogStatus(null)
+    } catch {
+      setLogStatus('error')
     }
   }
 
@@ -172,10 +176,10 @@ export default function AdminPage() {
     else { setPasswordError('Incorrect password.') }
   }
 
-  async function handleSubmit(e) {
+  async function handleAddClient(e) {
     e.preventDefault()
     if (!clientName || !googleUrl || !slug) return
-    setStatus('loading'); setErrorMsg('')
+    setSubmitStatus('loading'); setErrorMsg('')
     const res = await fetch('/api/add-client', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -183,19 +187,20 @@ export default function AdminPage() {
     })
     const data = await res.json()
     if (res.ok) {
-      setStatus('success'); setResult({ slug, cardUrl })
-      setClientName(''); setGoogleUrl(''); setCustomSlug(''); setUseCustomSlug(false); setLocation('')
-      setPlaceSelected(false); setQuery(''); setSuggestions([])
-      setPitchStatus(null); setPitchHistory([]); setLogStatus(null); setCurrentPlaceId('')
+      setSubmitStatus('success')
+      setResult({ slug, cardUrl: `https://${DOMAIN}/${slug}` })
     } else {
-      setStatus('error'); setErrorMsg(data.error || 'Something went wrong.')
+      setSubmitStatus('error')
+      setErrorMsg(data.error || 'Something went wrong.')
     }
   }
 
   function reset() {
-    setStatus(null); setResult(null); setErrorMsg(''); setPlaceSelected(false)
-    setQuery(''); setClientName(''); setGoogleUrl(''); setLocation('')
-    setPitchStatus(null); setPitchHistory([]); setLogStatus(null); setCurrentPlaceId('')
+    setSubmitStatus(null); setResult(null); setErrorMsg('')
+    setPlaceSelected(false); setQuery('')
+    setClientName(''); setGoogleUrl(''); setPlaceId(''); setSlug('')
+    setPitchStatus(null); setPitchHistory([])
+    setLogStatus(null); setRepName(''); setVisitOutcome('')
   }
 
   const s = {
@@ -206,13 +211,11 @@ export default function AdminPage() {
     label: { display: 'block', fontSize: '12px', fontWeight: '600', color: '#16181A', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' },
     input: { width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1.5px solid #E5DFD3', fontSize: '15px', color: '#16181A', background: '#FAFAF8', outline: 'none', boxSizing: 'border-box' },
     select: { width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1.5px solid #E5DFD3', fontSize: '15px', color: '#16181A', background: '#FAFAF8', outline: 'none', boxSizing: 'border-box' },
-    preview: { background: '#F2ECE0', borderRadius: '8px', padding: '12px 14px', fontSize: '13px', color: '#8C6937', fontWeight: '600', marginBottom: '20px', fontFamily: 'monospace', wordBreak: 'break-all' },
     btn: { width: '100%', padding: '14px', background: '#16181A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' },
     logBtn: { width: '100%', padding: '11px', background: '#F2ECE0', color: '#16181A', border: '1.5px solid #E5DFD3', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginTop: '8px' },
-    error: { color: '#c0392b', fontSize: '13px', marginBottom: '16px' },
+    error: { color: '#c0392b', fontSize: '13px', marginBottom: '12px' },
     hint: { fontSize: '12px', color: '#6B7280', marginBottom: '6px' },
     confirmed: { fontSize: '12px', color: '#8C6937', fontWeight: '600', marginBottom: '16px' },
-    toggleLink: { fontSize: '12px', color: '#8C6937', cursor: 'pointer', textDecoration: 'underline', display: 'inline-block', marginBottom: '20px' },
     divider: { border: 'none', borderTop: '1px solid #E5DFD3', marginBottom: '24px' },
     sectionDivider: { border: 'none', borderTop: '1px dashed #E5DFD3', margin: '20px 0' },
     urlBox: { background: '#16181A', color: '#F2ECE0', borderRadius: '8px', padding: '14px 16px', fontSize: '14px', fontFamily: 'monospace', fontWeight: '600', marginBottom: '16px', wordBreak: 'break-all' },
@@ -223,19 +226,27 @@ export default function AdminPage() {
     dropdownItem: { padding: '11px 14px', cursor: 'pointer', fontSize: '14px', color: '#16181A' },
     statusNew: { background: '#ECFDF5', border: '1.5px solid #6EE7B7', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#065F46', fontWeight: '600', marginBottom: '16px' },
     statusPitched: { background: '#FFFBEB', border: '1.5px solid #FCD34D', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#92400E', fontWeight: '600', marginBottom: '8px' },
-    statusClient: { background: '#FEF2F2', border: '1.5px solid #FCA5A5', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#991B1B', fontWeight: '600', marginBottom: '16px' },
     statusChecking: { background: '#F3F4F6', border: '1.5px solid #D1D5DB', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#6B7280', marginBottom: '16px' },
     pitchRecord: { fontSize: '12px', color: '#78350F', fontWeight: '400', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #FDE68A' },
+    slugPreview: { fontSize: '12px', color: '#8C6937', fontFamily: 'monospace', marginBottom: '16px' },
   }
 
+  // ── Login screen ──────────────────────────────────────────────────────────
   if (!authed) {
     return (
       <div style={s.page}><div style={s.card}>
         <div style={s.logo}>Apex Tap Cards</div>
-        <div style={s.sub}>Admin — Add Client</div>
+        <div style={s.sub}>Admin Portal</div>
         <form onSubmit={handleLogin}>
           <label style={s.label}>Password</label>
-          <input style={{ ...s.input, marginBottom: '20px' }} type="password" placeholder="Enter admin password" value={password} onChange={e => setPassword(e.target.value)} autoFocus />
+          <input
+            style={{ ...s.input, marginBottom: '20px' }}
+            type="password"
+            placeholder="Enter admin password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            autoFocus
+          />
           {passwordError && <div style={s.error}>{passwordError}</div>}
           <button style={s.btn} type="submit">Sign In</button>
         </form>
@@ -243,34 +254,43 @@ export default function AdminPage() {
     )
   }
 
-  if (status === 'success' && result) {
+  // ── Success screen ────────────────────────────────────────────────────────
+  if (submitStatus === 'success' && result) {
     return (
       <div style={s.page}><div style={s.card}>
         <div style={s.logo}>Apex Tap Cards</div>
-        <div style={s.sub}>Admin — Add Client</div>
+        <div style={s.sub}>Client Added</div>
         <hr style={s.divider} />
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>✓</div>
-          <div style={{ fontSize: '18px', fontWeight: '700', color: '#16181A', marginBottom: '8px' }}>Client added!</div>
-          <div style={{ fontSize: '13px', color: '#6B7280', marginBottom: '24px' }}>Program each NFC card with this URL:</div>
+          <div style={{ fontSize: '18px', fontWeight: '700', color: '#16181A', marginBottom: '8px' }}>
+            {clientName} is live!
+          </div>
+          <div style={{ fontSize: '13px', color: '#6B7280', marginBottom: '24px' }}>
+            Program each NFC card with this URL:
+          </div>
           <div style={s.urlLabel}>Card URL</div>
           <div style={s.urlBox}>{result.cardUrl}</div>
-          <button style={s.copyBtn} onClick={() => navigator.clipboard.writeText(result.cardUrl)}>Copy URL</button>
+          <button style={s.copyBtn} onClick={() => navigator.clipboard.writeText(result.cardUrl)}>
+            Copy URL
+          </button>
           <button style={s.anotherBtn} onClick={reset}>Add Another Client</button>
         </div>
       </div></div>
     )
   }
 
-  const isReady = clientName.trim() && googleUrl.trim() && slug.trim() && pitchStatus !== 'checking'
+  const canSubmit = placeSelected && slug.trim() && pitchStatus !== 'checking' && submitStatus !== 'loading'
 
+  // ── Main form ─────────────────────────────────────────────────────────────
   return (
     <div style={s.page}><div style={s.card}>
       <div style={s.logo}>Apex Tap Cards</div>
       <div style={s.sub}>Admin — Add Client</div>
       <hr style={s.divider} />
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleAddClient}>
 
+        {/* STEP 1: Search */}
         <label style={s.label}>Search Business</label>
         <div style={{ position: 'relative', marginBottom: '20px' }}>
           <input
@@ -291,11 +311,16 @@ export default function AdminPage() {
                 return (
                   <div
                     key={i}
-                    style={{ ...s.dropdownItem, borderBottom: i < suggestions.length - 1 ? '1px solid #F2ECE0' : 'none', background: 'transparent' }}
+                    style={{
+                      ...s.dropdownItem,
+                      borderBottom: i < suggestions.length - 1 ? '1px solid #F2ECE0' : 'none',
+                    }}
                     onMouseDown={() => handleSelect(sug)}
                   >
-                    {main}
-                    {secondary && <span style={{ fontSize: '12px', color: '#9CA3AF', marginLeft: '6px' }}>{secondary}</span>}
+                    <div>{main}</div>
+                    {secondary && (
+                      <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>{secondary}</div>
+                    )}
                   </div>
                 )
               })}
@@ -309,11 +334,6 @@ export default function AdminPage() {
         )}
         {pitchStatus === 'new' && (
           <div style={s.statusNew}>🟢 New lead — never been visited</div>
-        )}
-        {pitchStatus === 'client' && (
-          <div style={{ ...s.statusPitched, background: '#FFF7ED', borderColor: '#FED7AA', color: '#9A3412', marginBottom: '16px' }}>
-            ⚠️ This business name is already a client — if this is a different location, update the URL slug below before adding
-          </div>
         )}
         {pitchStatus === 'pitched' && (
           <div style={{ marginBottom: '16px' }}>
@@ -363,42 +383,40 @@ export default function AdminPage() {
             >
               {logStatus === 'loading' ? 'Logging...' : 'Log Visit'}
             </button>
+            {logStatus === 'error' && <div style={{ ...s.error, marginTop: '8px' }}>Failed to log — try again.</div>}
           </>
         )}
         {logStatus === 'logged' && (
           <div style={{ ...s.confirmed, marginTop: '8px' }}>✓ Visit logged</div>
         )}
 
-        {/* Add client section */}
+        {/* Add client */}
         {placeSelected && pitchStatus !== 'checking' && (
           <>
             <hr style={s.sectionDivider} />
             <div style={s.confirmed}>✓ {clientName} — review link ready</div>
 
-            <label style={s.label}>URL Slug</label>
+            <label style={s.label}>Card URL Slug</label>
             <input
-              style={{ ...s.input, marginBottom: '8px' }}
+              style={{ ...s.input, marginBottom: '6px', fontFamily: 'monospace' }}
               type="text"
-              placeholder="marios-pizza"
               value={slug}
-              onChange={e => { setUseCustomSlug(true); setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')) }}
+              onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
             />
-            <div style={{ ...s.hint, marginBottom: '16px' }}>
-              Card URL: <span style={{ fontFamily: 'monospace', color: '#8C6937' }}>{DOMAIN}/{slug || '...'}</span>
-            </div>
+            <div style={s.slugPreview}>{DOMAIN}/{slug || '...'}</div>
 
-            {status === 'error' && <div style={s.error}>{errorMsg}</div>}
+            {submitStatus === 'error' && <div style={s.error}>{errorMsg}</div>}
 
             <button
               style={{
                 ...s.btn,
-                opacity: !isReady || status === 'loading' ? 0.4 : 1,
-                cursor: !isReady || status === 'loading' ? 'not-allowed' : 'pointer',
+                opacity: !canSubmit ? 0.4 : 1,
+                cursor: !canSubmit ? 'not-allowed' : 'pointer',
               }}
               type="submit"
-              disabled={!isReady || status === 'loading'}
+              disabled={!canSubmit}
             >
-              {status === 'loading' ? 'Adding...' : 'Add Client'}
+              {submitStatus === 'loading' ? 'Adding...' : 'Add Client'}
             </button>
           </>
         )}
