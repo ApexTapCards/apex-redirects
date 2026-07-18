@@ -15,19 +15,14 @@ function toSlug(str) {
   return str.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-')
 }
 
-// Extract city from full Google Places text e.g. "Salutes, Val Caron, ON, Canada"
 function extractCity(fullText, businessName) {
   let text = fullText || ''
-  // Strip the business name from the front
   if (businessName && text.toLowerCase().startsWith(businessName.toLowerCase())) {
     text = text.slice(businessName.length).replace(/^[,\s]+/, '')
   }
-  // text is now e.g. "Val Caron, ON, Canada" or "123 Main St, Val Caron, ON, Canada"
   const parts = text.split(',').map(p => p.trim()).filter(Boolean)
-  // Find the province code (2 uppercase letters like "ON", "QC")
   const provIdx = parts.findIndex(p => /^[A-Z]{2}(\s|$)/.test(p))
   const limit = provIdx > 0 ? provIdx : parts.length
-  // Return first part that doesn't start with a digit (skip street numbers)
   for (let i = 0; i < limit; i++) {
     if (parts[i] && !/^\d/.test(parts[i])) return parts[i]
   }
@@ -41,31 +36,26 @@ function formatDate(dateStr) {
 }
 
 export default function AdminPage() {
-  // Auth
   const [authed, setAuthed] = useState(false)
   const [password, setPassword] = useState('')
   const [passwordError, setPasswordError] = useState('')
 
-  // Search
   const [query, setQuery] = useState('')
   const [suggestions, setSuggestions] = useState([])
   const [showDropdown, setShowDropdown] = useState(false)
   const [placeSelected, setPlaceSelected] = useState(false)
 
-  // Selected business
   const [clientName, setClientName] = useState('')
   const [googleUrl, setGoogleUrl] = useState('')
   const [placeId, setPlaceId] = useState('')
   const [slug, setSlug] = useState('')
 
-  // Pitch tracking
   const [pitchStatus, setPitchStatus] = useState(null)
   const [pitchHistory, setPitchHistory] = useState([])
   const [repName, setRepName] = useState('')
   const [visitOutcome, setVisitOutcome] = useState('')
   const [logStatus, setLogStatus] = useState(null)
 
-  // Add client
   const [submitStatus, setSubmitStatus] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
   const [result, setResult] = useState(null)
@@ -120,7 +110,6 @@ export default function AdminPage() {
     const fullText = pred?.text?.text || ''
     const city = extractCity(fullText, name)
     const autoSlug = city ? toSlug(name) + '-' + toSlug(city) : toSlug(name)
-
     setClientName(name)
     setGoogleUrl(`https://search.google.com/local/writereview?placeid=${id}`)
     setPlaceId(id)
@@ -157,12 +146,8 @@ export default function AdminPage() {
           visited_at: new Date().toISOString(),
         }, ...prev])
         if (pitchStatus === 'new') setPitchStatus('pitched')
-      } else {
-        setLogStatus('error')
-      }
-    } catch {
-      setLogStatus('error')
-    }
+      } else { setLogStatus('error') }
+    } catch { setLogStatus('error') }
   }
 
   async function handleLogin(e) {
@@ -203,107 +188,220 @@ export default function AdminPage() {
     setLogStatus(null); setRepName(''); setVisitOutcome('')
   }
 
-  const s = {
-    page: { minHeight: '100vh', background: '#F2ECE0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, -apple-system, sans-serif', padding: '24px' },
-    card: { background: '#fff', borderRadius: '16px', padding: '40px', width: '100%', maxWidth: '440px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' },
-    logo: { fontSize: '22px', fontWeight: '700', color: '#16181A', marginBottom: '4px', letterSpacing: '-0.5px' },
-    sub: { fontSize: '13px', color: '#8C6937', marginBottom: '32px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' },
-    label: { display: 'block', fontSize: '12px', fontWeight: '600', color: '#16181A', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' },
-    input: { width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1.5px solid #E5DFD3', fontSize: '15px', color: '#16181A', background: '#FAFAF8', outline: 'none', boxSizing: 'border-box' },
-    select: { width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1.5px solid #E5DFD3', fontSize: '15px', color: '#16181A', background: '#FAFAF8', outline: 'none', boxSizing: 'border-box' },
-    btn: { width: '100%', padding: '14px', background: '#16181A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' },
-    logBtn: { width: '100%', padding: '11px', background: '#F2ECE0', color: '#16181A', border: '1.5px solid #E5DFD3', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginTop: '8px' },
-    error: { color: '#c0392b', fontSize: '13px', marginBottom: '12px' },
-    hint: { fontSize: '12px', color: '#6B7280', marginBottom: '6px' },
-    confirmed: { fontSize: '12px', color: '#8C6937', fontWeight: '600', marginBottom: '16px' },
-    divider: { border: 'none', borderTop: '1px solid #E5DFD3', marginBottom: '24px' },
-    sectionDivider: { border: 'none', borderTop: '1px dashed #E5DFD3', margin: '20px 0' },
-    urlBox: { background: '#16181A', color: '#F2ECE0', borderRadius: '8px', padding: '14px 16px', fontSize: '14px', fontFamily: 'monospace', fontWeight: '600', marginBottom: '16px', wordBreak: 'break-all' },
-    urlLabel: { fontSize: '11px', color: '#8C6937', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' },
-    copyBtn: { width: '100%', padding: '12px', background: '#8C6937', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '12px' },
-    anotherBtn: { width: '100%', padding: '12px', background: 'transparent', color: '#16181A', border: '1.5px solid #E5DFD3', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
-    dropdown: { position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1.5px solid #E5DFD3', borderRadius: '8px', zIndex: 9999, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', marginTop: '4px', overflow: 'hidden' },
-    dropdownItem: { padding: '11px 14px', cursor: 'pointer', fontSize: '14px', color: '#16181A' },
-    statusNew: { background: '#ECFDF5', border: '1.5px solid #6EE7B7', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#065F46', fontWeight: '600', marginBottom: '16px' },
-    statusPitched: { background: '#FFFBEB', border: '1.5px solid #FCD34D', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#92400E', fontWeight: '600', marginBottom: '8px' },
-    statusChecking: { background: '#F3F4F6', border: '1.5px solid #D1D5DB', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#6B7280', marginBottom: '16px' },
-    pitchRecord: { fontSize: '12px', color: '#78350F', fontWeight: '400', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #FDE68A' },
-    slugPreview: { fontSize: '12px', color: '#8C6937', fontFamily: 'monospace', marginBottom: '16px' },
+  const canSubmit = placeSelected && slug.trim() && pitchStatus !== 'checking' && submitStatus !== 'loading'
+
+  // ── Shared layout wrapper ─────────────────────────────────────────────────
+  const Page = ({ children }) => (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(145deg, #0D1426 0%, #162050 60%, #0D1426 100%)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+      padding: '24px',
+    }}>
+      {/* Subtle dot pattern overlay */}
+      <div style={{
+        position: 'fixed', inset: 0, pointerEvents: 'none',
+        backgroundImage: 'radial-gradient(circle, rgba(214,174,82,0.06) 1px, transparent 1px)',
+        backgroundSize: '28px 28px',
+      }} />
+      <div style={{ position: 'relative', width: '100%', maxWidth: '460px' }}>
+        {/* Top brand bar */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginBottom: '16px', padding: '0 4px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '32px', height: '32px', borderRadius: '8px',
+              background: 'linear-gradient(135deg, #D6AE52, #B8902A)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '16px',
+            }}>⬡</div>
+            <div>
+              <div style={{ color: '#fff', fontWeight: '700', fontSize: '15px', letterSpacing: '-0.3px' }}>
+                Apex Tap Cards
+              </div>
+              <div style={{ color: '#D6AE52', fontSize: '11px', fontWeight: '500', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+                Admin Portal
+              </div>
+            </div>
+          </div>
+          {authed && (
+            <div style={{
+              background: 'rgba(214,174,82,0.12)', border: '1px solid rgba(214,174,82,0.25)',
+              borderRadius: '20px', padding: '4px 12px',
+              color: '#D6AE52', fontSize: '11px', fontWeight: '600', letterSpacing: '0.5px',
+            }}>LIVE</div>
+          )}
+        </div>
+        {/* Card */}
+        <div style={{
+          background: '#fff',
+          borderRadius: '20px',
+          padding: '36px',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06)',
+        }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+
+  const Label = ({ children }) => (
+    <div style={{
+      fontSize: '11px', fontWeight: '700', color: '#6B7280',
+      textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '7px',
+    }}>{children}</div>
+  )
+
+  const inputStyle = {
+    width: '100%', padding: '11px 14px', borderRadius: '10px',
+    border: '1.5px solid #E5E7EB', fontSize: '15px', color: '#111827',
+    background: '#F9FAFB', outline: 'none', boxSizing: 'border-box',
+    transition: 'border-color 0.15s',
   }
 
-  // ── Login screen ──────────────────────────────────────────────────────────
+  const divider = (
+    <div style={{ borderTop: '1px solid #F3F4F6', margin: '24px 0' }} />
+  )
+
+  const dashedDivider = (
+    <div style={{ borderTop: '1px dashed #E5E7EB', margin: '20px 0' }} />
+  )
+
+  // ── Login ─────────────────────────────────────────────────────────────────
   if (!authed) {
     return (
-      <div style={s.page}><div style={s.card}>
-        <div style={s.logo}>Apex Tap Cards</div>
-        <div style={s.sub}>Admin Portal</div>
+      <Page>
+        <div style={{ marginBottom: '28px' }}>
+          <div style={{ fontSize: '22px', fontWeight: '700', color: '#111827', letterSpacing: '-0.5px' }}>
+            Sign in
+          </div>
+          <div style={{ fontSize: '14px', color: '#6B7280', marginTop: '4px' }}>
+            Enter your password to access the portal
+          </div>
+        </div>
         <form onSubmit={handleLogin}>
-          <label style={s.label}>Password</label>
+          <Label>Password</Label>
           <input
-            style={{ ...s.input, marginBottom: '20px' }}
+            style={{ ...inputStyle, marginBottom: '16px' }}
             type="password"
-            placeholder="Enter admin password"
+            placeholder="••••••••"
             value={password}
             onChange={e => setPassword(e.target.value)}
             autoFocus
           />
-          {passwordError && <div style={s.error}>{passwordError}</div>}
-          <button style={s.btn} type="submit">Sign In</button>
+          {passwordError && (
+            <div style={{ color: '#DC2626', fontSize: '13px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>✕</span> {passwordError}
+            </div>
+          )}
+          <button
+            style={{
+              width: '100%', padding: '13px', borderRadius: '10px',
+              background: 'linear-gradient(135deg, #D6AE52, #B8902A)',
+              color: '#fff', border: 'none', fontSize: '15px', fontWeight: '700',
+              cursor: 'pointer', letterSpacing: '0.2px',
+            }}
+            type="submit"
+          >
+            Sign In
+          </button>
         </form>
-      </div></div>
+      </Page>
     )
   }
 
-  // ── Success screen ────────────────────────────────────────────────────────
+  // ── Success ───────────────────────────────────────────────────────────────
   if (submitStatus === 'success' && result) {
     return (
-      <div style={s.page}><div style={s.card}>
-        <div style={s.logo}>Apex Tap Cards</div>
-        <div style={s.sub}>Client Added</div>
-        <hr style={s.divider} />
+      <Page>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>✓</div>
-          <div style={{ fontSize: '18px', fontWeight: '700', color: '#16181A', marginBottom: '8px' }}>
+          <div style={{
+            width: '64px', height: '64px', borderRadius: '50%',
+            background: 'linear-gradient(135deg, #D6AE52, #B8902A)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '28px', margin: '0 auto 20px',
+          }}>✓</div>
+          <div style={{ fontSize: '20px', fontWeight: '700', color: '#111827', marginBottom: '6px' }}>
             {clientName} is live!
           </div>
-          <div style={{ fontSize: '13px', color: '#6B7280', marginBottom: '24px' }}>
-            Program each NFC card with this URL:
+          <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '28px' }}>
+            Program each NFC card with this URL
           </div>
-          <div style={s.urlLabel}>Card URL</div>
-          <div style={s.urlBox}>{result.cardUrl}</div>
-          <button style={s.copyBtn} onClick={() => navigator.clipboard.writeText(result.cardUrl)}>
+          <div style={{
+            background: '#0D1426', borderRadius: '12px', padding: '16px 18px',
+            fontFamily: 'monospace', fontSize: '14px', color: '#D6AE52',
+            fontWeight: '600', marginBottom: '16px', wordBreak: 'break-all',
+            border: '1px solid rgba(214,174,82,0.2)',
+          }}>
+            {result.cardUrl}
+          </div>
+          <button
+            style={{
+              width: '100%', padding: '13px', borderRadius: '10px',
+              background: 'linear-gradient(135deg, #D6AE52, #B8902A)',
+              color: '#fff', border: 'none', fontSize: '14px', fontWeight: '700',
+              cursor: 'pointer', marginBottom: '10px',
+            }}
+            onClick={() => navigator.clipboard.writeText(result.cardUrl)}
+          >
             Copy URL
           </button>
-          <button style={s.anotherBtn} onClick={reset}>Add Another Client</button>
+          <button
+            style={{
+              width: '100%', padding: '12px', borderRadius: '10px',
+              background: 'transparent', color: '#6B7280',
+              border: '1.5px solid #E5E7EB', fontSize: '14px', fontWeight: '600',
+              cursor: 'pointer',
+            }}
+            onClick={reset}
+          >
+            Add Another Client
+          </button>
         </div>
-      </div></div>
+      </Page>
     )
   }
-
-  const canSubmit = placeSelected && slug.trim() && pitchStatus !== 'checking' && submitStatus !== 'loading'
 
   // ── Main form ─────────────────────────────────────────────────────────────
   return (
-    <div style={s.page}><div style={s.card}>
-      <div style={s.logo}>Apex Tap Cards</div>
-      <div style={s.sub}>Admin — Add Client</div>
-      <hr style={s.divider} />
+    <Page>
       <form onSubmit={handleAddClient}>
 
-        {/* STEP 1: Search */}
-        <label style={s.label}>Search Business</label>
+        {/* Search */}
+        <Label>Search Business</Label>
         <div style={{ position: 'relative', marginBottom: '20px' }}>
           <input
-            style={{ ...s.input, borderColor: placeSelected ? '#8C6937' : '#E5DFD3' }}
+            style={{
+              ...inputStyle,
+              borderColor: placeSelected ? '#D6AE52' : '#E5E7EB',
+              paddingLeft: '42px',
+            }}
             type="text"
-            placeholder="Type business name..."
+            placeholder="Type a business name..."
             value={query}
             onChange={handleQueryChange}
             onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
             onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
           />
+          {/* Search icon */}
+          <div style={{
+            position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)',
+            color: '#9CA3AF', fontSize: '16px', pointerEvents: 'none',
+          }}>⌕</div>
+
           {showDropdown && suggestions.length > 0 && (
-            <div style={s.dropdown}>
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
+              background: '#fff', borderRadius: '12px', zIndex: 9999,
+              boxShadow: '0 8px 30px rgba(0,0,0,0.12)', border: '1.5px solid #E5E7EB',
+              overflow: 'hidden',
+            }}>
               {suggestions.map((sug, i) => {
                 const pred = sug.placePrediction
                 const main = pred?.structuredFormat?.mainText?.text || pred?.text?.text || ''
@@ -312,12 +410,14 @@ export default function AdminPage() {
                   <div
                     key={i}
                     style={{
-                      ...s.dropdownItem,
-                      borderBottom: i < suggestions.length - 1 ? '1px solid #F2ECE0' : 'none',
+                      padding: '11px 16px', cursor: 'pointer',
+                      borderBottom: i < suggestions.length - 1 ? '1px solid #F3F4F6' : 'none',
                     }}
                     onMouseDown={() => handleSelect(sug)}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F9FAFB'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   >
-                    <div>{main}</div>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>{main}</div>
                     {secondary && (
                       <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>{secondary}</div>
                     )}
@@ -328,90 +428,151 @@ export default function AdminPage() {
           )}
         </div>
 
-        {/* Pitch status */}
+        {/* Status badges */}
         {pitchStatus === 'checking' && (
-          <div style={s.statusChecking}>Checking status...</div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            background: '#F9FAFB', borderRadius: '10px', padding: '10px 14px',
+            marginBottom: '16px', fontSize: '13px', color: '#6B7280',
+          }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#D1D5DB' }} />
+            Checking status...
+          </div>
         )}
+
         {pitchStatus === 'new' && (
-          <div style={s.statusNew}>🟢 New lead — never been visited</div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '10px',
+            padding: '10px 14px', marginBottom: '16px', fontSize: '13px',
+            color: '#15803D', fontWeight: '600',
+          }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
+            New lead — never been visited
+          </div>
         )}
+
         {pitchStatus === 'pitched' && (
-          <div style={{ marginBottom: '16px' }}>
-            <div style={s.statusPitched}>
-              🟡 Already visited
-              {pitchHistory.map((p, i) => (
-                <div key={i} style={s.pitchRecord}>
-                  {p.visited_by} · {formatDate(p.visited_at)} · {OUTCOMES[p.outcome] || p.outcome}
-                </div>
-              ))}
+          <div style={{
+            background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '10px',
+            padding: '12px 14px', marginBottom: '16px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#92400E', fontWeight: '600', marginBottom: pitchHistory.length ? '10px' : '0' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
+              Already visited
             </div>
+            {pitchHistory.map((p, i) => (
+              <div key={i} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                fontSize: '12px', color: '#78350F', padding: '6px 0',
+                borderTop: i === 0 ? '1px solid #FDE68A' : 'none',
+              }}>
+                <span style={{ fontWeight: '600' }}>{p.visited_by}</span>
+                <span style={{ color: '#92400E' }}>{OUTCOMES[p.outcome] || p.outcome}</span>
+                <span style={{ color: '#A16207' }}>{formatDate(p.visited_at)}</span>
+              </div>
+            ))}
           </div>
         )}
 
         {/* Log visit */}
         {placeSelected && (pitchStatus === 'new' || pitchStatus === 'pitched') && logStatus !== 'logged' && (
           <>
-            <hr style={s.sectionDivider} />
-            <label style={s.label}>Log This Visit</label>
+            {dashedDivider}
+            <Label>Log This Visit</Label>
             <input
-              style={{ ...s.input, marginBottom: '8px' }}
+              style={{ ...inputStyle, marginBottom: '8px' }}
               type="text"
               placeholder="Your name"
               value={repName}
               onChange={e => setRepName(e.target.value)}
             />
             <select
-              style={{ ...s.select, marginBottom: '8px' }}
+              style={{ ...inputStyle, marginBottom: '8px', appearance: 'none', cursor: 'pointer' }}
               value={visitOutcome}
               onChange={e => setVisitOutcome(e.target.value)}
             >
-              <option value="">Select outcome</option>
+              <option value="">Select outcome...</option>
               <option value="pitched">Pitched — Awaiting Decision</option>
               <option value="not_interested">Not Interested</option>
               <option value="follow_up">Follow-Up Scheduled</option>
-              <option value="sold">Sold</option>
+              <option value="sold">Sold ✓</option>
             </select>
             <button
               type="button"
               style={{
-                ...s.logBtn,
-                opacity: !repName.trim() || !visitOutcome || logStatus === 'loading' ? 0.4 : 1,
+                width: '100%', padding: '11px', borderRadius: '10px',
+                background: 'transparent', color: '#374151',
+                border: '1.5px solid #D1D5DB', fontSize: '14px', fontWeight: '600',
                 cursor: !repName.trim() || !visitOutcome ? 'not-allowed' : 'pointer',
+                opacity: !repName.trim() || !visitOutcome || logStatus === 'loading' ? 0.4 : 1,
+                marginTop: '2px',
               }}
               onClick={handleLogVisit}
               disabled={!repName.trim() || !visitOutcome || logStatus === 'loading'}
             >
               {logStatus === 'loading' ? 'Logging...' : 'Log Visit'}
             </button>
-            {logStatus === 'error' && <div style={{ ...s.error, marginTop: '8px' }}>Failed to log — try again.</div>}
+            {logStatus === 'error' && (
+              <div style={{ color: '#DC2626', fontSize: '12px', marginTop: '8px' }}>Failed to log — try again.</div>
+            )}
           </>
         )}
         {logStatus === 'logged' && (
-          <div style={{ ...s.confirmed, marginTop: '8px' }}>✓ Visit logged</div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            color: '#15803D', fontSize: '13px', fontWeight: '600', marginTop: '8px',
+          }}>
+            <span>✓</span> Visit logged
+          </div>
         )}
 
         {/* Add client */}
         {placeSelected && pitchStatus !== 'checking' && (
           <>
-            <hr style={s.sectionDivider} />
-            <div style={s.confirmed}>✓ {clientName} — review link ready</div>
+            {dashedDivider}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              color: '#15803D', fontSize: '13px', fontWeight: '600', marginBottom: '18px',
+            }}>
+              <span>✓</span> {clientName} — review link ready
+            </div>
 
-            <label style={s.label}>Card URL Slug</label>
-            <input
-              style={{ ...s.input, marginBottom: '6px', fontFamily: 'monospace' }}
-              type="text"
-              value={slug}
-              onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-            />
-            <div style={s.slugPreview}>{DOMAIN}/{slug || '...'}</div>
+            <Label>Card URL Slug</Label>
+            <div style={{ position: 'relative', marginBottom: '6px' }}>
+              <input
+                style={{ ...inputStyle, fontFamily: 'monospace', fontSize: '14px', paddingRight: '14px' }}
+                type="text"
+                value={slug}
+                onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+              />
+            </div>
+            <div style={{
+              fontSize: '12px', color: '#9CA3AF', fontFamily: 'monospace',
+              marginBottom: '20px', padding: '8px 12px',
+              background: '#F9FAFB', borderRadius: '8px', border: '1px solid #F3F4F6',
+            }}>
+              {DOMAIN}/<span style={{ color: '#D6AE52', fontWeight: '600' }}>{slug || '...'}</span>
+            </div>
 
-            {submitStatus === 'error' && <div style={s.error}>{errorMsg}</div>}
+            {submitStatus === 'error' && (
+              <div style={{
+                color: '#DC2626', fontSize: '13px', marginBottom: '14px',
+                background: '#FEF2F2', borderRadius: '8px', padding: '10px 12px',
+                border: '1px solid #FECACA',
+              }}>{errorMsg}</div>
+            )}
 
             <button
               style={{
-                ...s.btn,
-                opacity: !canSubmit ? 0.4 : 1,
-                cursor: !canSubmit ? 'not-allowed' : 'pointer',
+                width: '100%', padding: '14px', borderRadius: '10px',
+                background: canSubmit
+                  ? 'linear-gradient(135deg, #D6AE52, #B8902A)'
+                  : '#E5E7EB',
+                color: canSubmit ? '#fff' : '#9CA3AF',
+                border: 'none', fontSize: '15px', fontWeight: '700',
+                cursor: canSubmit ? 'pointer' : 'not-allowed',
+                letterSpacing: '0.2px', transition: 'all 0.15s',
               }}
               type="submit"
               disabled={!canSubmit}
@@ -422,6 +583,6 @@ export default function AdminPage() {
         )}
 
       </form>
-    </div></div>
+    </Page>
   )
 }
