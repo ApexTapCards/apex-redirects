@@ -12,15 +12,26 @@ export async function GET(request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY
   )
 
-  // Check if already a client — by the full location-specific slug
-  if (passedSlug) {
+  // Check if already a client — exact slug match OR name match
+  if (passedSlug || businessName) {
+    const conditions = []
+    if (passedSlug) conditions.push(`slug.eq.${passedSlug}`)
+    if (businessName) conditions.push(`client_name.ilike.${businessName}`)
+
     const { data: clients } = await supabase
       .from('redirects')
       .select('client_name, slug')
-      .eq('slug', passedSlug)
+      .or(conditions.join(','))
 
     if (clients && clients.length > 0) {
-      return NextResponse.json({ status: 'client', client: clients[0] })
+      // Only block if the exact slug already exists (same location)
+      // A name-only match means it's a different location of the same business
+      const exactMatch = clients.some(c => c.slug === passedSlug)
+      if (exactMatch || !passedSlug) {
+        return NextResponse.json({ status: 'client', client: clients[0] })
+      }
+      // Different location — warn but don't block
+      return NextResponse.json({ status: 'existing_location', clients })
     }
   }
 
