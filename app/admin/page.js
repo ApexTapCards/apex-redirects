@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 
 const DOMAIN = 'go.apextapcards.com'
+const GOLD = '#C8A84B'
 
 const OUTCOMES = {
   pitched: 'Pitched — Awaiting Decision',
@@ -29,52 +30,115 @@ function extractCity(fullText, businessName) {
   return ''
 }
 
-function formatDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString('en-CA', {
-    month: 'short', day: 'numeric', year: 'numeric',
-  })
+function fmt(dateStr) {
+  return new Date(dateStr).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-export default function AdminPage() {
-  const [mobile, setMobile] = useState(false)
-  const [authed, setAuthed] = useState(false)
-  const [password, setPassword] = useState('')
-  const [passwordError, setPasswordError] = useState('')
+// ─── Shared UI pieces ────────────────────────────────────────────────────────
 
-  const [query, setQuery] = useState('')
+function Field({ label, children }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      {label && (
+        <div style={{
+          fontSize: 11, fontWeight: 700, color: '#8A8A9A',
+          textTransform: 'uppercase', letterSpacing: '0.9px', marginBottom: 7,
+        }}>{label}</div>
+      )}
+      {children}
+    </div>
+  )
+}
+
+function GoldButton({ children, disabled, type = 'button', onClick, style = {} }) {
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        width: '100%',
+        height: 54,
+        borderRadius: 14,
+        border: 'none',
+        background: disabled
+          ? '#EBEBEB'
+          : `linear-gradient(135deg, #D4AA50 0%, #9A7200 100%)`,
+        color: disabled ? '#B0B0B0' : '#fff',
+        fontSize: 16,
+        fontWeight: 700,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        letterSpacing: 0.2,
+        boxShadow: disabled ? 'none' : '0 4px 18px rgba(200,168,75,0.4)',
+        transition: 'opacity 0.15s',
+        fontFamily: 'inherit',
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function OutlineButton({ children, onClick, style = {} }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        width: '100%',
+        height: 50,
+        borderRadius: 14,
+        border: '1.5px solid #E0E0E0',
+        background: 'transparent',
+        color: '#555',
+        fontSize: 15,
+        fontWeight: 600,
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+// ─── Main component ──────────────────────────────────────────────────────────
+
+export default function AdminPage() {
+  const [authed, setAuthed]         = useState(false)
+  const [password, setPassword]     = useState('')
+  const [pwError, setPwError]       = useState('')
+
+  const [query, setQuery]           = useState('')
   const [suggestions, setSuggestions] = useState([])
-  const [showDropdown, setShowDropdown] = useState(false)
-  const [placeSelected, setPlaceSelected] = useState(false)
+  const [showDrop, setShowDrop]     = useState(false)
+  const [selected, setSelected]     = useState(false)
 
   const [clientName, setClientName] = useState('')
-  const [googleUrl, setGoogleUrl] = useState('')
-  const [placeId, setPlaceId] = useState('')
-  const [slug, setSlug] = useState('')
+  const [googleUrl, setGoogleUrl]   = useState('')
+  const [placeId, setPlaceId]       = useState('')
+  const [slug, setSlug]             = useState('')
 
-  const [pitchStatus, setPitchStatus] = useState(null)
+  const [pitchStatus, setPitchStatus]   = useState(null)  // null | checking | new | pitched
   const [pitchHistory, setPitchHistory] = useState([])
-  const [repName, setRepName] = useState('')
-  const [visitOutcome, setVisitOutcome] = useState('')
-  const [logStatus, setLogStatus] = useState(null)
+  const [repName, setRepName]           = useState('')
+  const [outcome, setOutcome]           = useState('')
+  const [logStatus, setLogStatus]       = useState(null)  // null | loading | logged | error
 
-  const [submitStatus, setSubmitStatus] = useState(null)
-  const [errorMsg, setErrorMsg] = useState('')
-  const [result, setResult] = useState(null)
-  const [copied, setCopied] = useState(false)
+  const [addStatus, setAddStatus]   = useState(null)  // null | loading | success | error
+  const [addError, setAddError]     = useState('')
+  const [result, setResult]         = useState(null)
+  const [copied, setCopied]         = useState(false)
 
-  const debounceRef = useRef(null)
-  const dropdownRef = useRef(null)
-  const dropdownMouseDown = useRef(false)
+  const debounce  = useRef(null)
+  const inDrop    = useRef(false)
 
-  useEffect(() => {
-    const check = () => setMobile(window.innerWidth < 640)
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [])
+  // ── Autocomplete ──────────────────────────────────────────────────────────
 
   async function fetchSuggestions(input) {
-    if (input.length < 2) { setSuggestions([]); setShowDropdown(false); return }
+    if (input.length < 2) { setSuggestions([]); setShowDrop(false); return }
     try {
       const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
         method: 'POST',
@@ -87,25 +151,46 @@ export default function AdminPage() {
       const data = await res.json()
       const list = data.suggestions || []
       setSuggestions(list)
-      setShowDropdown(list.length > 0)
-    } catch (err) { console.error('Autocomplete error:', err) }
+      setShowDrop(list.length > 0)
+    } catch {}
   }
 
-  function handleQueryChange(e) {
-    const val = e.target.value
-    setQuery(val)
-    setPlaceSelected(false)
+  function onQueryChange(e) {
+    const v = e.target.value
+    setQuery(v)
+    setSelected(false)
     setClientName(''); setGoogleUrl(''); setPlaceId(''); setSlug('')
     setPitchStatus(null); setPitchHistory([]); setLogStatus(null)
-    setSubmitStatus(null); setErrorMsg('')
-    clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => fetchSuggestions(val), 300)
+    setAddStatus(null); setAddError('')
+    clearTimeout(debounce.current)
+    debounce.current = setTimeout(() => fetchSuggestions(v), 300)
   }
 
-  async function checkPitchHistory(id) {
+  function pickSuggestion(sug) {
+    const pred = sug.placePrediction
+    const name = pred?.structuredFormat?.mainText?.text || pred?.text?.text || ''
+    const id   = pred?.placeId || ''
+    const full = pred?.text?.text || ''
+    const city = extractCity(full, name)
+    const auto = city ? toSlug(name) + '-' + toSlug(city) : toSlug(name)
+
+    setClientName(name)
+    setGoogleUrl(`https://search.google.com/local/writereview?placeid=${id}`)
+    setPlaceId(id)
+    setSlug(auto)
+    setQuery(name)
+    setSelected(true)
+    setSuggestions([]); setShowDrop(false)
+    setPitchHistory([]); setLogStatus(null); setOutcome('')
+    setAddStatus(null); setAddError('')
+
+    checkPitch(id)
+  }
+
+  async function checkPitch(id) {
     setPitchStatus('checking')
     try {
-      const res = await fetch(`/api/check-pitch?placeId=${encodeURIComponent(id)}`)
+      const res  = await fetch(`/api/check-pitch?placeId=${encodeURIComponent(id)}`)
       const data = await res.json()
       setPitchStatus(data.status)
       if (data.pitches) setPitchHistory(data.pitches)
@@ -114,52 +199,29 @@ export default function AdminPage() {
     }
   }
 
-  function handleSelect(suggestion) {
-    const pred = suggestion.placePrediction
-    const name = pred?.structuredFormat?.mainText?.text || pred?.text?.text || ''
-    const id = pred?.placeId || ''
-    const fullText = pred?.text?.text || ''
-    const city = extractCity(fullText, name)
-    const autoSlug = city ? toSlug(name) + '-' + toSlug(city) : toSlug(name)
-    setClientName(name)
-    setGoogleUrl(`https://search.google.com/local/writereview?placeid=${id}`)
-    setPlaceId(id)
-    setSlug(autoSlug)
-    setQuery(name)
-    setPlaceSelected(true)
-    setSuggestions([])
-    setShowDropdown(false)
-    setPitchHistory([]); setLogStatus(null); setVisitOutcome('')
-    setSubmitStatus(null); setErrorMsg('')
-    checkPitchHistory(id)
-  }
+  // ── Log visit ─────────────────────────────────────────────────────────────
 
   async function handleLogVisit() {
-    if (!repName.trim() || !visitOutcome) return
+    if (!repName.trim() || !outcome) return
     setLogStatus('loading')
     try {
       const res = await fetch('/api/log-pitch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          place_id: placeId,
-          business_name: clientName,
-          visited_by: repName.trim(),
-          outcome: visitOutcome,
-          password,
+          place_id: placeId, business_name: clientName,
+          visited_by: repName.trim(), outcome, password,
         }),
       })
       if (res.ok) {
         setLogStatus('logged')
-        setPitchHistory(prev => [{
-          visited_by: repName.trim(),
-          outcome: visitOutcome,
-          visited_at: new Date().toISOString(),
-        }, ...prev])
+        setPitchHistory(prev => [{ visited_by: repName.trim(), outcome, visited_at: new Date().toISOString() }, ...prev])
         if (pitchStatus === 'new') setPitchStatus('pitched')
       } else { setLogStatus('error') }
     } catch { setLogStatus('error') }
   }
+
+  // ── Login ─────────────────────────────────────────────────────────────────
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -168,14 +230,16 @@ export default function AdminPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password }),
     })
-    if (res.ok) { setAuthed(true); setPasswordError('') }
-    else { setPasswordError('Incorrect password.') }
+    if (res.ok) { setAuthed(true); setPwError('') }
+    else setPwError('Wrong password.')
   }
+
+  // ── Add client ────────────────────────────────────────────────────────────
 
   async function handleAddClient(e) {
     e.preventDefault()
     if (!clientName || !googleUrl || !slug) return
-    setSubmitStatus('loading'); setErrorMsg('')
+    setAddStatus('loading'); setAddError('')
     const res = await fetch('/api/add-client', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -183,11 +247,11 @@ export default function AdminPage() {
     })
     const data = await res.json()
     if (res.ok) {
-      setSubmitStatus('success')
+      setAddStatus('success')
       setResult({ slug, cardUrl: `https://${DOMAIN}/${slug}` })
     } else {
-      setSubmitStatus('error')
-      setErrorMsg(data.error || 'Something went wrong.')
+      setAddStatus('error')
+      setAddError(data.error || 'Something went wrong.')
     }
   }
 
@@ -199,584 +263,452 @@ export default function AdminPage() {
   }
 
   function reset() {
-    setSubmitStatus(null); setResult(null); setErrorMsg(''); setCopied(false)
-    setPlaceSelected(false); setQuery('')
+    setAddStatus(null); setResult(null); setAddError(''); setCopied(false)
+    setSelected(false); setQuery('')
     setClientName(''); setGoogleUrl(''); setPlaceId(''); setSlug('')
     setPitchStatus(null); setPitchHistory([])
-    setLogStatus(null); setRepName(''); setVisitOutcome('')
+    setLogStatus(null); setRepName(''); setOutcome('')
   }
 
-  const canSubmit = placeSelected && slug.trim() && pitchStatus !== 'checking' && submitStatus !== 'loading'
+  const canAdd = selected && slug.trim() && pitchStatus !== 'checking' && addStatus !== 'loading'
 
-  // ─── Design tokens ────────────────────────────────────────────────────────
-  const gold = '#C9A227'
-  const goldDark = '#8B6A00'
-  const p = mobile ? '24px 20px' : '40px 36px'
-  const r = mobile ? '20px' : '24px'
-  const inputH = '52px'
-  const btnH = mobile ? '56px' : '52px'
+  // ─── Shared input style ───────────────────────────────────────────────────
 
-  const inputBase = {
+  const inp = {
     width: '100%',
-    height: inputH,
-    padding: '0 16px',
-    borderRadius: '12px',
-    border: '1.5px solid #E8E8EC',
-    fontSize: '16px', // 16px prevents iOS zoom
-    color: '#0D1117',
+    height: 50,
+    padding: '0 14px',
+    borderRadius: 12,
+    border: '1.5px solid #E2E2E8',
+    fontSize: 16,        // must be 16+ to prevent iOS zoom
+    color: '#111',
     background: '#FAFAFA',
-    outline: 'none',
     boxSizing: 'border-box',
     fontFamily: 'inherit',
+    outline: 'none',
     WebkitAppearance: 'none',
-    transition: 'border-color 0.15s, box-shadow 0.15s',
+    appearance: 'none',
   }
 
-  const goldGradient = `linear-gradient(135deg, ${gold} 0%, ${goldDark} 100%)`
+  // ─── Page wrapper ─────────────────────────────────────────────────────────
+  //
+  //  Layout: top-down, max-width 480px, centred. No vertical-centering trick
+  //  (that's what broke mobile — centering a tall card with the keyboard open).
+  //  Background is always the dark navy; on mobile it just fills the space above
+  //  the white content section.
 
-  // ─── Page shell ───────────────────────────────────────────────────────────
-  const Shell = ({ children }) => (
+  return (
     <div style={{
-      minHeight: '100dvh',
-      background: '#06091A',
-      backgroundImage: `
-        radial-gradient(ellipse 100% 45% at 50% 0%, rgba(201,162,39,0.18) 0%, transparent 65%),
-        radial-gradient(ellipse 70% 35% at 10% 100%, rgba(15,30,80,0.6) 0%, transparent 60%)
-      `,
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
-      padding: mobile ? '20px 0 40px' : '40px 16px',
+      minHeight: '100vh',
+      background: '#080D1C',
+      backgroundImage:
+        'radial-gradient(ellipse 90% 40% at 50% 0%, rgba(200,168,75,0.15) 0%, transparent 65%)',
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      WebkitFontSmoothing: 'antialiased',
     }}>
       <style>{`
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(16px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes popIn {
-          0%   { opacity: 0; transform: scale(0.7); }
-          70%  { transform: scale(1.08); }
-          100% { opacity: 1; transform: scale(1); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-        .atc-input:focus {
-          border-color: ${gold} !important;
-          box-shadow: 0 0 0 3px rgba(201,162,39,0.15) !important;
-          background: #fff !important;
-        }
-        .atc-btn-gold:active { opacity: 0.85; transform: scale(0.98); }
-        .atc-btn-ghost:active { background: #F5F5F5 !important; }
-        .atc-drop-item:active { background: #F5F5F7 !important; }
+        .atc-inp:focus { border-color: ${GOLD} !important; background: #fff !important; box-shadow: 0 0 0 3px rgba(200,168,75,0.13) !important; }
+        .atc-row:active { background: #F5F5F7 !important; }
+        .atc-gbtn:active { opacity: 0.82; }
       `}</style>
-      {children}
-    </div>
-  )
 
-  // ─── Brand bar ────────────────────────────────────────────────────────────
-  const Brand = ({ live }) => (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      width: '100%', marginBottom: '16px',
-      padding: mobile ? '0 20px' : '0 4px',
-      animation: 'fadeUp 0.4s ease both',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
+      {/* ── Inner column ─────────────────────────────────────── */}
+      <div style={{ maxWidth: 480, margin: '0 auto', padding: '0 0 60px' }}>
+
+        {/* ── Top bar ──────────────────────────────────────────── */}
         <div style={{
-          width: '40px', height: '40px', borderRadius: '12px',
-          background: goldGradient,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '18px', fontWeight: '800', color: '#fff',
-          boxShadow: `0 6px 20px rgba(201,162,39,0.45)`,
-          letterSpacing: '-1px', flexShrink: 0,
-        }}>A</div>
-        <div>
-          <div style={{
-            color: '#FFFFFF', fontWeight: '700', fontSize: '15px',
-            letterSpacing: '-0.3px', lineHeight: 1.2,
-          }}>Apex Tap Cards</div>
-          <div style={{
-            color: 'rgba(255,255,255,0.38)', fontSize: '11px',
-            letterSpacing: '0.6px', textTransform: 'uppercase', marginTop: '1px',
-          }}>Admin Portal</div>
-        </div>
-      </div>
-      {live && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '6px',
-          background: 'rgba(201,162,39,0.1)',
-          border: '1px solid rgba(201,162,39,0.22)',
-          borderRadius: '20px', padding: '5px 12px',
-          color: gold, fontSize: '11px', fontWeight: '700', letterSpacing: '0.8px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '20px 20px 16px',
         }}>
-          <div style={{
-            width: '6px', height: '6px', borderRadius: '50%',
-            background: gold, boxShadow: `0 0 8px ${gold}`,
-            animation: 'pulse 2s ease infinite',
-          }} />
-          LIVE
-        </div>
-      )}
-    </div>
-  )
-
-  // ─── Card ─────────────────────────────────────────────────────────────────
-  const Card = ({ children, style = {} }) => (
-    <div style={{
-      width: mobile ? 'calc(100% - 32px)' : '100%',
-      maxWidth: '460px',
-      background: '#FFFFFF',
-      borderRadius: r,
-      padding: p,
-      boxShadow: '0 24px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)',
-      animation: 'fadeUp 0.4s ease 0.05s both',
-      ...style,
-    }}>
-      {children}
-    </div>
-  )
-
-  // ─── Input helper ─────────────────────────────────────────────────────────
-  const Input = ({ style: s = {}, ...props }) => (
-    <input
-      className="atc-input"
-      style={{ ...inputBase, ...s }}
-      {...props}
-    />
-  )
-
-  // ─── Label helper ─────────────────────────────────────────────────────────
-  const Label = ({ children }) => (
-    <div style={{
-      fontSize: '11px', fontWeight: '700', color: '#A0A0B0',
-      textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px',
-    }}>{children}</div>
-  )
-
-  const Divider = () => (
-    <div style={{ borderTop: '1px solid #F0F0F4', margin: '22px 0' }} />
-  )
-
-  // ─── Login ────────────────────────────────────────────────────────────────
-  if (!authed) {
-    return (
-      <Shell>
-        <Brand live={false} />
-        <Card>
-          <div style={{
-            fontSize: mobile ? '26px' : '24px', fontWeight: '800',
-            color: '#0D1117', letterSpacing: '-0.7px', marginBottom: '4px',
-          }}>
-            Welcome back
-          </div>
-          <div style={{ fontSize: '15px', color: '#9CA3AF', marginBottom: '28px' }}>
-            Sign in to manage your clients
-          </div>
-
-          <form onSubmit={handleLogin}>
-            <Label>Password</Label>
-            <Input
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              autoFocus
-              style={{ marginBottom: '14px' }}
-            />
-            {passwordError && (
-              <div style={{
-                color: '#DC2626', fontSize: '14px', marginBottom: '14px',
-                background: '#FEF2F2', padding: '12px 14px', borderRadius: '10px',
-                border: '1px solid #FECACA', fontWeight: '500',
-              }}>
-                {passwordError}
-              </div>
-            )}
-            <button
-              className="atc-btn-gold"
-              type="submit"
-              style={{
-                width: '100%', height: btnH, borderRadius: '12px',
-                background: goldGradient,
-                color: '#fff', border: 'none', fontSize: '16px', fontWeight: '700',
-                cursor: 'pointer', letterSpacing: '0.1px',
-                boxShadow: `0 6px 20px rgba(201,162,39,0.4)`,
-                transition: 'opacity 0.15s, transform 0.1s',
-              }}
-            >
-              Sign In
-            </button>
-          </form>
-        </Card>
-      </Shell>
-    )
-  }
-
-  // ─── Success ──────────────────────────────────────────────────────────────
-  if (submitStatus === 'success' && result) {
-    return (
-      <Shell>
-        <Brand live={true} />
-        <Card style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '80px', height: '80px', borderRadius: '50%',
-            background: goldGradient,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '36px', margin: '0 auto 20px',
-            boxShadow: `0 10px 32px rgba(201,162,39,0.5)`,
-            animation: 'popIn 0.5s cubic-bezier(.36,.07,.19,.97) both',
-          }}>✓</div>
-
-          <div style={{
-            fontSize: mobile ? '24px' : '22px', fontWeight: '800',
-            color: '#0D1117', letterSpacing: '-0.6px', marginBottom: '6px',
-          }}>
-            {clientName} is live!
-          </div>
-          <div style={{ fontSize: '15px', color: '#9CA3AF', marginBottom: '28px' }}>
-            Program each NFC card with this URL
-          </div>
-
-          <div style={{
-            background: '#06091A',
-            borderRadius: '14px', padding: '18px 16px',
-            fontFamily: "'SF Mono', 'Fira Code', monospace",
-            fontSize: mobile ? '13px' : '14px',
-            color: gold, fontWeight: '600',
-            marginBottom: '20px', wordBreak: 'break-all',
-            border: `1px solid rgba(201,162,39,0.18)`,
-            letterSpacing: '0.1px', lineHeight: 1.5,
-          }}>
-            {result.cardUrl}
-          </div>
-
-          <button
-            className="atc-btn-gold"
-            onClick={copyUrl}
-            style={{
-              width: '100%', height: btnH, borderRadius: '12px',
-              background: copied ? 'linear-gradient(135deg, #22C55E, #16A34A)' : goldGradient,
-              color: '#fff', border: 'none', fontSize: '16px', fontWeight: '700',
-              cursor: 'pointer', marginBottom: '10px',
-              boxShadow: copied
-                ? '0 6px 20px rgba(34,197,94,0.4)'
-                : `0 6px 20px rgba(201,162,39,0.4)`,
-              transition: 'all 0.25s',
-            }}
-          >
-            {copied ? '✓ Copied!' : 'Copy URL'}
-          </button>
-          <button
-            className="atc-btn-ghost"
-            onClick={reset}
-            style={{
-              width: '100%', height: mobile ? '50px' : '46px', borderRadius: '12px',
-              background: 'transparent', color: '#6B7280',
-              border: '1.5px solid #E5E7EB', fontSize: '15px', fontWeight: '600',
-              cursor: 'pointer', transition: 'background 0.15s',
-            }}
-          >
-            Add Another Client
-          </button>
-        </Card>
-      </Shell>
-    )
-  }
-
-  // ─── Main form ────────────────────────────────────────────────────────────
-  return (
-    <Shell>
-      <Brand live={true} />
-      <Card>
-        <form onSubmit={handleAddClient}>
-
-          {/* Search */}
-          <Label>Search Business</Label>
-          <div style={{ position: 'relative', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
-              position: 'absolute', left: '16px', top: '50%',
-              transform: 'translateY(-50%)',
-              color: placeSelected ? gold : '#C0C0C8',
-              fontSize: '16px', pointerEvents: 'none', zIndex: 1,
-              transition: 'color 0.15s',
-            }}>⌕</div>
-            <Input
-              type="text"
-              placeholder="Type a business name..."
-              value={query}
-              onChange={handleQueryChange}
-              onFocus={() => { if (suggestions.length > 0) setShowDropdown(true) }}
-              onBlur={() => {
-                if (!dropdownMouseDown.current) setShowDropdown(false)
-              }}
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck="false"
-              style={{
-                paddingLeft: '44px',
-                borderColor: placeSelected ? gold : '#E8E8EC',
-                boxShadow: placeSelected ? `0 0 0 3px rgba(201,162,39,0.12)` : 'none',
-                background: placeSelected ? '#FFFEF8' : '#FAFAFA',
-              }}
-            />
+              width: 38, height: 38, borderRadius: 11,
+              background: `linear-gradient(145deg, #D4AA50, #8B6A00)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 800, fontSize: 17, color: '#fff',
+              boxShadow: '0 4px 14px rgba(200,168,75,0.45)',
+              flexShrink: 0,
+            }}>A</div>
+            <div>
+              <div style={{ color: '#fff', fontWeight: 700, fontSize: 15, letterSpacing: -0.3 }}>
+                Apex Tap Cards
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.38)', fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                Admin Portal
+              </div>
+            </div>
+          </div>
 
-            {showDropdown && suggestions.length > 0 && (
-              <div
-                ref={dropdownRef}
-                onMouseDown={() => { dropdownMouseDown.current = true }}
-                onMouseUp={() => { dropdownMouseDown.current = false }}
-                onTouchStart={() => { dropdownMouseDown.current = true }}
+          {authed && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'rgba(200,168,75,0.1)', border: '1px solid rgba(200,168,75,0.22)',
+              borderRadius: 20, padding: '5px 11px',
+              color: GOLD, fontSize: 11, fontWeight: 700, letterSpacing: 0.8,
+            }}>
+              <div style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: GOLD, boxShadow: `0 0 7px ${GOLD}`,
+              }} />
+              LIVE
+            </div>
+          )}
+        </div>
+
+        {/* ── White content area ────────────────────────────────── */}
+        <div style={{
+          background: '#fff',
+          borderRadius: '22px 22px 0 0',
+          minHeight: 'calc(100vh - 90px)',
+          padding: '28px 20px 32px',
+        }}>
+
+          {/* ═══ LOGIN ════════════════════════════════════════════ */}
+          {!authed && (
+            <form onSubmit={handleLogin}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#0B1120', letterSpacing: -0.6, marginBottom: 4 }}>
+                Sign in
+              </div>
+              <div style={{ fontSize: 15, color: '#9A9AAA', marginBottom: 28 }}>
+                Enter your password to continue
+              </div>
+
+              <Field label="Password">
+                <input
+                  className="atc-inp"
+                  style={inp}
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  autoFocus
+                />
+              </Field>
+
+              {pwError && (
+                <div style={{
+                  background: '#FEF2F2', border: '1px solid #FECACA',
+                  borderRadius: 10, padding: '11px 14px',
+                  color: '#DC2626', fontSize: 14, fontWeight: 500, marginBottom: 14,
+                }}>{pwError}</div>
+              )}
+
+              <GoldButton type="submit">Sign In</GoldButton>
+            </form>
+          )}
+
+          {/* ═══ SUCCESS ══════════════════════════════════════════ */}
+          {authed && addStatus === 'success' && result && (
+            <div style={{ textAlign: 'center', paddingTop: 12 }}>
+              <div style={{
+                width: 76, height: 76, borderRadius: '50%',
+                background: `linear-gradient(135deg, #D4AA50, #8B6A00)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 34, color: '#fff', margin: '0 auto 20px',
+                boxShadow: '0 8px 28px rgba(200,168,75,0.45)',
+              }}>✓</div>
+
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#0B1120', letterSpacing: -0.5, marginBottom: 6 }}>
+                {clientName} is live!
+              </div>
+              <div style={{ fontSize: 15, color: '#9A9AAA', marginBottom: 24 }}>
+                Program each NFC card with this URL
+              </div>
+
+              <div style={{
+                background: '#080D1C', borderRadius: 14,
+                padding: '16px 14px', marginBottom: 18,
+                fontFamily: 'monospace', fontSize: 14,
+                color: GOLD, fontWeight: 700,
+                wordBreak: 'break-all', lineHeight: 1.5,
+                border: '1px solid rgba(200,168,75,0.15)',
+              }}>
+                {result.cardUrl}
+              </div>
+
+              <GoldButton
+                onClick={copyUrl}
                 style={{
-                  position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0,
-                  background: '#fff', borderRadius: '14px', zIndex: 9999,
-                  boxShadow: '0 16px 48px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
-                  overflow: 'hidden',
+                  marginBottom: 10,
+                  background: copied
+                    ? 'linear-gradient(135deg, #22C55E, #16A34A)'
+                    : `linear-gradient(135deg, #D4AA50, #8B6A00)`,
+                  boxShadow: copied
+                    ? '0 4px 18px rgba(34,197,94,0.4)'
+                    : '0 4px 18px rgba(200,168,75,0.4)',
                 }}
               >
-                {suggestions.map((sug, i) => {
-                  const pred = sug.placePrediction
-                  const main = pred?.structuredFormat?.mainText?.text || pred?.text?.text || ''
-                  const secondary = pred?.structuredFormat?.secondaryText?.text || ''
-                  return (
+                {copied ? '✓ Copied!' : 'Copy URL'}
+              </GoldButton>
+              <OutlineButton onClick={reset}>Add Another Client</OutlineButton>
+            </div>
+          )}
+
+          {/* ═══ MAIN FORM ════════════════════════════════════════ */}
+          {authed && addStatus !== 'success' && (
+            <form onSubmit={handleAddClient}>
+
+              {/* Search */}
+              <Field label="Search Business">
+                <div style={{ position: 'relative' }}>
+                  <div style={{
+                    position: 'absolute', left: 14, top: '50%',
+                    transform: 'translateY(-50%)',
+                    fontSize: 17, color: selected ? GOLD : '#C0C0CC',
+                    pointerEvents: 'none', transition: 'color 0.15s',
+                    lineHeight: 1,
+                  }}>⌕</div>
+                  <input
+                    className="atc-inp"
+                    style={{ ...inp, paddingLeft: 42 }}
+                    type="text"
+                    placeholder="Type a business name..."
+                    value={query}
+                    onChange={onQueryChange}
+                    onFocus={() => { if (suggestions.length > 0) setShowDrop(true) }}
+                    onBlur={() => { if (!inDrop.current) setShowDrop(false) }}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck="false"
+                  />
+
+                  {/* Dropdown */}
+                  {showDrop && suggestions.length > 0 && (
                     <div
-                      key={i}
-                      className="atc-drop-item"
-                      onMouseDown={e => { e.preventDefault(); handleSelect(sug) }}
-                      onTouchEnd={e => { e.preventDefault(); handleSelect(sug) }}
+                      onMouseDown={() => { inDrop.current = true }}
+                      onMouseUp={() => { inDrop.current = false }}
+                      onTouchStart={() => { inDrop.current = true }}
+                      onTouchEnd={() => { inDrop.current = false }}
                       style={{
-                        padding: mobile ? '14px 16px' : '12px 16px',
-                        cursor: 'pointer',
-                        borderBottom: i < suggestions.length - 1 ? '1px solid #F5F5F7' : 'none',
-                        transition: 'background 0.1s',
-                        minHeight: '52px',
-                        display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                        position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
+                        background: '#fff', borderRadius: 14, zIndex: 9999,
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.06)',
+                        overflow: 'hidden',
                       }}
                     >
-                      <div style={{ fontSize: '15px', fontWeight: '600', color: '#0D1117', lineHeight: 1.3 }}>{main}</div>
-                      {secondary && (
-                        <div style={{ fontSize: '13px', color: '#A0A0B0', marginTop: '2px', lineHeight: 1.3 }}>{secondary}</div>
-                      )}
+                      {suggestions.map((sug, i) => {
+                        const pred = sug.placePrediction
+                        const main = pred?.structuredFormat?.mainText?.text || pred?.text?.text || ''
+                        const sec  = pred?.structuredFormat?.secondaryText?.text || ''
+                        return (
+                          <div
+                            key={i}
+                            className="atc-row"
+                            onMouseDown={e => { e.preventDefault(); pickSuggestion(sug) }}
+                            onTouchEnd={e => { e.preventDefault(); pickSuggestion(sug) }}
+                            style={{
+                              padding: '13px 16px',
+                              borderBottom: i < suggestions.length - 1 ? '1px solid #F3F3F6' : 'none',
+                              cursor: 'pointer',
+                              minHeight: 56,
+                              display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                            }}
+                          >
+                            <div style={{ fontSize: 15, fontWeight: 600, color: '#111', lineHeight: 1.3 }}>{main}</div>
+                            {sec && <div style={{ fontSize: 13, color: '#A0A0B0', marginTop: 2, lineHeight: 1.3 }}>{sec}</div>}
+                          </div>
+                        )
+                      })}
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+                  )}
+                </div>
+              </Field>
 
-          {/* Status */}
-          {pitchStatus === 'checking' && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '10px',
-              background: '#F5F5F7', borderRadius: '12px',
-              padding: '13px 16px', marginBottom: '16px',
-              fontSize: '14px', color: '#9CA3AF', fontWeight: '500',
-            }}>
-              <div style={{
-                width: '8px', height: '8px', borderRadius: '50%', background: '#D1D5DB',
-                animation: 'pulse 1.2s ease infinite',
-              }} />
-              Checking visit history...
-            </div>
-          )}
-
-          {pitchStatus === 'new' && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '10px',
-              background: '#F0FDF4', border: '1px solid #BBF7D0',
-              borderRadius: '12px', padding: '13px 16px', marginBottom: '16px',
-              fontSize: '14px', color: '#15803D', fontWeight: '600',
-            }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
-              New lead — never been visited
-            </div>
-          )}
-
-          {pitchStatus === 'pitched' && (
-            <div style={{
-              background: '#FFFBEB', border: '1px solid #FDE68A',
-              borderRadius: '12px', padding: '13px 16px', marginBottom: '16px',
-            }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                fontSize: '14px', color: '#92400E', fontWeight: '700',
-                marginBottom: pitchHistory.length ? '12px' : 0,
-              }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
-                Already visited
-              </div>
-              {pitchHistory.map((p, i) => (
-                <div key={i} style={{
-                  display: 'grid',
-                  gridTemplateColumns: mobile ? '1fr 1fr' : '1fr 1.6fr 1fr',
-                  gap: '4px 8px',
-                  fontSize: '13px', color: '#78350F',
-                  padding: '8px 0',
-                  borderTop: '1px solid rgba(253,230,138,0.7)',
+              {/* Status banner */}
+              {pitchStatus === 'checking' && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  background: '#F5F5F8', borderRadius: 12,
+                  padding: '13px 16px', marginBottom: 20,
+                  fontSize: 14, color: '#9A9AAA',
                 }}>
-                  <span style={{ fontWeight: '700' }}>{p.visited_by}</span>
-                  {!mobile && <span style={{ color: '#92400E' }}>{OUTCOMES[p.outcome] || p.outcome}</span>}
-                  <span style={{ color: '#A16207', textAlign: mobile ? 'right' : 'right' }}>{formatDate(p.visited_at)}</span>
-                  {mobile && <span style={{ color: '#92400E', gridColumn: '1 / -1', fontSize: '12px' }}>{OUTCOMES[p.outcome] || p.outcome}</span>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Log visit */}
-          {placeSelected && (pitchStatus === 'new' || pitchStatus === 'pitched') && logStatus !== 'logged' && (
-            <>
-              <Divider />
-              <Label>Log This Visit</Label>
-              <Input
-                type="text"
-                placeholder="Your name"
-                value={repName}
-                onChange={e => setRepName(e.target.value)}
-                style={{ marginBottom: '8px' }}
-              />
-              <div style={{ position: 'relative', marginBottom: '10px' }}>
-                <select
-                  className="atc-input"
-                  style={{
-                    ...inputBase,
-                    paddingRight: '40px',
-                    WebkitAppearance: 'none',
-                    appearance: 'none',
-                    cursor: 'pointer',
-                    color: visitOutcome ? '#0D1117' : '#9CA3AF',
-                  }}
-                  value={visitOutcome}
-                  onChange={e => setVisitOutcome(e.target.value)}
-                >
-                  <option value="">Select outcome...</option>
-                  <option value="pitched">Pitched — Awaiting Decision</option>
-                  <option value="not_interested">Not Interested</option>
-                  <option value="follow_up">Follow-Up Scheduled</option>
-                  <option value="sold">Sold ✓</option>
-                </select>
-                <div style={{
-                  position: 'absolute', right: '14px', top: '50%',
-                  transform: 'translateY(-50%)', pointerEvents: 'none',
-                  color: '#9CA3AF', fontSize: '12px',
-                }}>▼</div>
-              </div>
-
-              <button
-                type="button"
-                className="atc-btn-ghost"
-                style={{
-                  width: '100%', height: mobile ? '50px' : '46px', borderRadius: '12px',
-                  background: 'transparent', color: '#374151',
-                  border: '1.5px solid #E5E7EB', fontSize: '15px', fontWeight: '600',
-                  cursor: !repName.trim() || !visitOutcome ? 'not-allowed' : 'pointer',
-                  opacity: !repName.trim() || !visitOutcome || logStatus === 'loading' ? 0.4 : 1,
-                  transition: 'background 0.15s, opacity 0.15s',
-                }}
-                onClick={handleLogVisit}
-                disabled={!repName.trim() || !visitOutcome || logStatus === 'loading'}
-              >
-                {logStatus === 'loading' ? 'Logging...' : 'Log Visit'}
-              </button>
-
-              {logStatus === 'error' && (
-                <div style={{ color: '#DC2626', fontSize: '13px', marginTop: '8px', fontWeight: '500' }}>
-                  Failed to log — try again.
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#D0D0DC', flexShrink: 0 }} />
+                  Checking visit history...
                 </div>
               )}
-            </>
-          )}
 
-          {logStatus === 'logged' && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              color: '#15803D', fontSize: '14px', fontWeight: '700',
-              background: '#F0FDF4', borderRadius: '10px',
-              padding: '11px 14px', marginTop: '4px',
-              border: '1px solid #BBF7D0',
-            }}>
-              <span style={{
-                width: '20px', height: '20px', borderRadius: '50%',
-                background: '#22C55E', color: '#fff', fontSize: '11px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0,
-              }}>✓</span>
-              Visit logged successfully
-            </div>
-          )}
-
-          {/* Add client */}
-          {placeSelected && pitchStatus !== 'checking' && (
-            <>
-              <Divider />
-
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                fontSize: '14px', color: '#15803D', fontWeight: '600',
-                background: '#F0FDF4', border: '1px solid #BBF7D0',
-                borderRadius: '10px', padding: '11px 14px', marginBottom: '20px',
-              }}>
-                <span>✓</span> {clientName} — review link ready
-              </div>
-
-              <Label>Card URL Slug</Label>
-              <Input
-                type="text"
-                value={slug}
-                onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                style={{
-                  fontFamily: "'SF Mono', 'Fira Code', monospace",
-                  fontSize: '15px', letterSpacing: '0.3px',
-                  marginBottom: '8px',
-                }}
-              />
-
-              {/* URL preview */}
-              <div style={{
-                background: '#06091A', borderRadius: '10px',
-                padding: '12px 14px', marginBottom: '20px',
-                fontFamily: "'SF Mono', 'Fira Code', monospace",
-                fontSize: '13px', letterSpacing: '0.2px',
-                border: '1px solid rgba(201,162,39,0.12)',
-                wordBreak: 'break-all', lineHeight: 1.5,
-              }}>
-                <span style={{ color: 'rgba(255,255,255,0.35)' }}>{DOMAIN}/</span>
-                <span style={{ color: gold, fontWeight: '700' }}>{slug || '...'}</span>
-              </div>
-
-              {submitStatus === 'error' && (
+              {pitchStatus === 'new' && (
                 <div style={{
-                  color: '#DC2626', fontSize: '14px', marginBottom: '16px',
-                  background: '#FEF2F2', borderRadius: '10px', padding: '12px 14px',
-                  border: '1px solid #FECACA', fontWeight: '500',
-                }}>{errorMsg}</div>
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  background: '#F0FDF4', border: '1px solid #BBF7D0',
+                  borderRadius: 12, padding: '13px 16px', marginBottom: 20,
+                  fontSize: 14, color: '#15803D', fontWeight: 600,
+                }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
+                  New lead — never been visited
+                </div>
               )}
 
-              <button
-                className={canSubmit ? 'atc-btn-gold' : ''}
-                type="submit"
-                disabled={!canSubmit}
-                style={{
-                  width: '100%', height: btnH, borderRadius: '12px',
-                  background: canSubmit ? goldGradient : '#F3F4F6',
-                  color: canSubmit ? '#fff' : '#C0C0C0',
-                  border: 'none', fontSize: '16px', fontWeight: '700',
-                  cursor: canSubmit ? 'pointer' : 'not-allowed',
-                  boxShadow: canSubmit ? `0 6px 20px rgba(201,162,39,0.4)` : 'none',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {submitStatus === 'loading' ? 'Adding...' : 'Add Client'}
-              </button>
-            </>
+              {pitchStatus === 'pitched' && (
+                <div style={{
+                  background: '#FFFBEB', border: '1px solid #FDE68A',
+                  borderRadius: 12, padding: '13px 16px', marginBottom: 20,
+                }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    fontSize: 14, color: '#92400E', fontWeight: 700,
+                    marginBottom: pitchHistory.length ? 10 : 0,
+                  }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
+                    Already visited
+                  </div>
+                  {pitchHistory.map((h, i) => (
+                    <div key={i} style={{
+                      borderTop: '1px solid rgba(253,230,138,0.8)',
+                      paddingTop: 8, marginTop: 8,
+                      fontSize: 13, color: '#78350F', lineHeight: 1.6,
+                    }}>
+                      <span style={{ fontWeight: 700 }}>{h.visited_by}</span>
+                      {' · '}
+                      <span>{OUTCOMES[h.outcome] || h.outcome}</span>
+                      {' · '}
+                      <span style={{ color: '#A16207' }}>{fmt(h.visited_at)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Log visit */}
+              {selected && (pitchStatus === 'new' || pitchStatus === 'pitched') && logStatus !== 'logged' && (
+                <div style={{
+                  background: '#F8F8FB', borderRadius: 16,
+                  padding: '18px 16px', marginBottom: 20,
+                  border: '1px solid #EBEBF0',
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#8A8A9A', textTransform: 'uppercase', letterSpacing: '0.9px', marginBottom: 12 }}>
+                    Log This Visit
+                  </div>
+                  <input
+                    className="atc-inp"
+                    style={{ ...inp, background: '#fff', marginBottom: 8 }}
+                    type="text"
+                    placeholder="Your name"
+                    value={repName}
+                    onChange={e => setRepName(e.target.value)}
+                  />
+                  <div style={{ position: 'relative', marginBottom: 12 }}>
+                    <select
+                      className="atc-inp"
+                      style={{
+                        ...inp, background: '#fff',
+                        paddingRight: 36,
+                        color: outcome ? '#111' : '#9A9AAA',
+                        cursor: 'pointer',
+                      }}
+                      value={outcome}
+                      onChange={e => setOutcome(e.target.value)}
+                    >
+                      <option value="">Select outcome...</option>
+                      <option value="pitched">Pitched — Awaiting Decision</option>
+                      <option value="not_interested">Not Interested</option>
+                      <option value="follow_up">Follow-Up Scheduled</option>
+                      <option value="sold">Sold ✓</option>
+                    </select>
+                    <div style={{
+                      position: 'absolute', right: 14, top: '50%',
+                      transform: 'translateY(-50%)',
+                      pointerEvents: 'none', color: '#9A9AAA', fontSize: 11,
+                    }}>▼</div>
+                  </div>
+                  <OutlineButton
+                    onClick={handleLogVisit}
+                    style={{
+                      opacity: !repName.trim() || !outcome || logStatus === 'loading' ? 0.4 : 1,
+                      cursor: !repName.trim() || !outcome ? 'not-allowed' : 'pointer',
+                      background: '#fff',
+                    }}
+                  >
+                    {logStatus === 'loading' ? 'Logging...' : 'Log Visit'}
+                  </OutlineButton>
+                  {logStatus === 'error' && (
+                    <div style={{ color: '#DC2626', fontSize: 13, marginTop: 8 }}>Failed — try again.</div>
+                  )}
+                </div>
+              )}
+
+              {logStatus === 'logged' && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  background: '#F0FDF4', border: '1px solid #BBF7D0',
+                  borderRadius: 12, padding: '12px 14px', marginBottom: 20,
+                  fontSize: 14, color: '#15803D', fontWeight: 600,
+                }}>
+                  <span style={{
+                    width: 20, height: 20, borderRadius: '50%',
+                    background: '#22C55E', color: '#fff', fontSize: 11,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>✓</span>
+                  Visit logged
+                </div>
+              )}
+
+              {/* Add client section */}
+              {selected && pitchStatus !== 'checking' && (
+                <div style={{
+                  background: '#F8F8FB', borderRadius: 16,
+                  padding: '18px 16px',
+                  border: '1px solid #EBEBF0',
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#8A8A9A', textTransform: 'uppercase', letterSpacing: '0.9px', marginBottom: 12 }}>
+                    Add as Client
+                  </div>
+
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    fontSize: 14, color: '#15803D', fontWeight: 600,
+                    marginBottom: 16,
+                  }}>
+                    <span style={{
+                      width: 18, height: 18, borderRadius: '50%',
+                      background: '#22C55E', color: '#fff', fontSize: 10,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>✓</span>
+                    {clientName}
+                  </div>
+
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#8A8A9A', textTransform: 'uppercase', letterSpacing: '0.9px', marginBottom: 7 }}>
+                    URL Slug
+                  </div>
+                  <input
+                    className="atc-inp"
+                    style={{ ...inp, background: '#fff', fontFamily: 'monospace', letterSpacing: 0.3, marginBottom: 10 }}
+                    type="text"
+                    value={slug}
+                    onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  />
+
+                  {/* URL preview */}
+                  <div style={{
+                    background: '#080D1C', borderRadius: 10,
+                    padding: '11px 13px', marginBottom: 16,
+                    fontFamily: 'monospace', fontSize: 13, lineHeight: 1.5,
+                    border: '1px solid rgba(200,168,75,0.12)',
+                    wordBreak: 'break-all',
+                  }}>
+                    <span style={{ color: 'rgba(255,255,255,0.3)' }}>{DOMAIN}/</span>
+                    <span style={{ color: GOLD, fontWeight: 700 }}>{slug || '...'}</span>
+                  </div>
+
+                  {addStatus === 'error' && (
+                    <div style={{
+                      background: '#FEF2F2', border: '1px solid #FECACA',
+                      borderRadius: 10, padding: '11px 14px', marginBottom: 14,
+                      color: '#DC2626', fontSize: 14, fontWeight: 500,
+                    }}>{addError}</div>
+                  )}
+
+                  <GoldButton type="submit" disabled={!canAdd}>
+                    {addStatus === 'loading' ? 'Adding...' : 'Add Client'}
+                  </GoldButton>
+                </div>
+              )}
+
+            </form>
           )}
 
-        </form>
-      </Card>
-    </Shell>
+        </div>
+      </div>
+    </div>
   )
 }
