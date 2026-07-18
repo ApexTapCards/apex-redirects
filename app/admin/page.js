@@ -4,13 +4,13 @@ import { useState, useRef } from 'react'
 
 const DOMAIN = 'go.apextapcards.com'
 const GOLD   = '#C4A535'
-const NAVY   = '#09101F'
+const NAVY   = '#090C18'
 
 const OUTCOMES = {
-  pitched:      'Pitched — Awaiting Decision',
+  pitched:       'Pitched — Awaiting Decision',
   not_interested:'Not Interested',
-  follow_up:    'Follow-Up Scheduled',
-  sold:         'Sold',
+  follow_up:     'Follow-Up Scheduled',
+  sold:          'Sold',
 }
 
 function toSlug(s) {
@@ -21,357 +21,443 @@ function extractCity(full, name) {
   let t = full || ''
   if (name && t.toLowerCase().startsWith(name.toLowerCase()))
     t = t.slice(name.length).replace(/^[,\s]+/,'')
-  const parts = t.split(',').map(p=>p.trim()).filter(Boolean)
-  const pi = parts.findIndex(p=>/^[A-Z]{2}(\s|$)/.test(p))
+  const parts = t.split(',').map(p => p.trim()).filter(Boolean)
+  const pi = parts.findIndex(p => /^[A-Z]{2}(\s|$)/.test(p))
   const lim = pi > 0 ? pi : parts.length
-  for (let i=0;i<lim;i++) if (parts[i] && !/^\d/.test(parts[i])) return parts[i]
+  for (let i = 0; i < lim; i++) if (parts[i] && !/^\d/.test(parts[i])) return parts[i]
   return ''
 }
 
 function fmtDate(d) {
-  return new Date(d).toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'})
+  return new Date(d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-/* ─── tiny shared components ─────────────────────────────────────────────── */
+/* ─── base styles ─────────────────────────────────────────────────────────── */
 
-const inp = {
-  display:'block', width:'100%', height:50, padding:'0 14px',
-  borderRadius:12, border:'1.5px solid #E4E4EC',
-  fontSize:16, color:'#111', background:'#F8F8FB',
-  boxSizing:'border-box', fontFamily:'inherit',
-  outline:'none', WebkitAppearance:'none', appearance:'none',
+const baseInput = {
+  display: 'block', width: '100%', height: 50, padding: '0 14px',
+  borderRadius: 11, border: '1.5px solid #E4E4EE',
+  fontSize: 16, color: '#0A0D1A', background: '#F8F8FC',
+  boxSizing: 'border-box', fontFamily: 'inherit',
+  outline: 'none', WebkitAppearance: 'none', appearance: 'none',
+  transition: 'border-color .15s, box-shadow .15s, background .15s',
 }
 
-function Input(props) {
-  return <input className="i" style={inp} {...props} />
-}
+/* ─── component helpers ───────────────────────────────────────────────────── */
 
-function Btn({ gold, disabled, children, ...rest }) {
+function SectionLabel({ children }) {
   return (
-    <button
-      style={{
-        width:'100%', height:52, borderRadius:13, border:'none',
-        background: disabled ? '#EDEDF0'
-                  : gold     ? `linear-gradient(135deg,#D4AA40,#8A6800)`
-                  :            'transparent',
-        color: disabled ? '#B8B8C0' : gold ? '#fff' : '#555',
-        border: (!gold && !disabled) ? '1.5px solid #DDDDE8' : 'none',
-        fontSize:16, fontWeight:700, cursor: disabled ? 'not-allowed':'pointer',
-        boxShadow: (gold && !disabled) ? '0 4px 16px rgba(196,165,53,.38)' : 'none',
-        fontFamily:'inherit', transition:'opacity .15s',
-      }}
-      disabled={disabled}
-      {...rest}
-    >
+    <div style={{
+      fontSize: 10, fontWeight: 700, color: '#A0A0B4',
+      textTransform: 'uppercase', letterSpacing: '1.1px', marginBottom: 10,
+    }}>
+      {children}
+    </div>
+  )
+}
+
+function Divider() {
+  return <div style={{ borderTop: '1px solid #EEEEF5', margin: '20px 0' }} />
+}
+
+function PrimaryBtn({ children, disabled, type = 'button', onClick, style: s = {} }) {
+  return (
+    <button type={type} onClick={onClick} disabled={disabled} style={{
+      display: 'block', width: '100%', height: 50, borderRadius: 12, border: 'none',
+      background: disabled
+        ? '#EBEBF2'
+        : 'linear-gradient(135deg, #D4AA40 0%, #8C6E00 100%)',
+      color: disabled ? '#B0B0C0' : '#fff',
+      fontSize: 16, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer',
+      letterSpacing: 0.1, fontFamily: 'inherit',
+      boxShadow: disabled ? 'none' : '0 4px 18px rgba(196,165,53,.38)',
+      transition: 'opacity .15s, box-shadow .15s',
+      ...s,
+    }}>
       {children}
     </button>
   )
 }
 
-function Label({ children }) {
+function GhostBtn({ children, onClick, disabled, style: s = {} }) {
   return (
-    <div style={{fontSize:11,fontWeight:700,color:'#909098',
-      textTransform:'uppercase',letterSpacing:'1px',marginBottom:7}}>
-      {children}
-    </div>
-  )
-}
-
-function StatusPill({ color, bg, border, dot, children }) {
-  return (
-    <div style={{
-      display:'flex',alignItems:'center',gap:9,
-      background:bg, border:`1px solid ${border}`,
-      borderRadius:12,padding:'12px 14px',
-      fontSize:14,color,fontWeight:600,marginBottom:16,
+    <button type="button" onClick={onClick} disabled={disabled} style={{
+      display: 'block', width: '100%', height: 48, borderRadius: 12,
+      border: '1.5px solid #DDDDE8', background: '#fff',
+      color: disabled ? '#C0C0CC' : '#4A4A5A',
+      fontSize: 15, fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer',
+      opacity: disabled ? 0.5 : 1, fontFamily: 'inherit',
+      transition: 'opacity .15s',
+      ...s,
     }}>
-      <div style={{width:8,height:8,borderRadius:'50%',background:dot,flexShrink:0}}/>
       {children}
-    </div>
+    </button>
   )
 }
 
 /* ─── page ────────────────────────────────────────────────────────────────── */
 
 export default function AdminPage() {
-  const [authed,setAuthed]   = useState(false)
-  const [pw,setPw]           = useState('')
-  const [pwErr,setPwErr]     = useState('')
+  const [authed, setAuthed]     = useState(false)
+  const [pw, setPw]             = useState('')
+  const [showPw, setShowPw]     = useState(false)
+  const [pwErr, setPwErr]       = useState('')
 
-  const [query,setQuery]     = useState('')
-  const [sugs,setSugs]       = useState([])
-  const [drop,setDrop]       = useState(false)
-  const [picked,setPicked]   = useState(false)
+  const [query, setQuery]       = useState('')
+  const [sugs, setSugs]         = useState([])
+  const [drop, setDrop]         = useState(false)
+  const [picked, setPicked]     = useState(false)
 
-  const [name,setName]       = useState('')
-  const [gUrl,setGUrl]       = useState('')
-  const [pid,setPid]         = useState('')
-  const [slug,setSlug]       = useState('')
+  const [bName, setBName]       = useState('')
+  const [gUrl, setGUrl]         = useState('')
+  const [pid, setPid]           = useState('')
+  const [slug, setSlug]         = useState('')
 
-  const [pStatus,setPStatus] = useState(null)
-  const [history,setHistory] = useState([])
-  const [rep,setRep]         = useState('')
-  const [outcome,setOutcome] = useState('')
-  const [logSt,setLogSt]     = useState(null)
+  const [pSt, setPSt]           = useState(null)
+  const [hist, setHist]         = useState([])
+  const [rep, setRep]           = useState('')
+  const [outcome, setOutcome]   = useState('')
+  const [logSt, setLogSt]       = useState(null)
 
-  const [addSt,setAddSt]     = useState(null)
-  const [addErr,setAddErr]   = useState('')
-  const [result,setResult]   = useState(null)
-  const [copied,setCopied]   = useState(false)
+  const [addSt, setAddSt]       = useState(null)
+  const [addErr, setAddErr]     = useState('')
+  const [result, setResult]     = useState(null)
+  const [copied, setCopied]     = useState(false)
 
   const dbc    = useRef(null)
   const inDrop = useRef(false)
 
+  /* handlers */
   async function fetchSugs(v) {
-    if (v.length<2){setSugs([]);setDrop(false);return}
+    if (v.length < 2) { setSugs([]); setDrop(false); return }
     try {
-      const r = await fetch('https://places.googleapis.com/v1/places:autocomplete',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','X-Goog-Api-Key':process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY},
-        body:JSON.stringify({input:v,includedPrimaryTypes:['establishment']}),
+      const r = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY },
+        body: JSON.stringify({ input: v, includedPrimaryTypes: ['establishment'] }),
       })
       const d = await r.json()
-      const list = d.suggestions||[]
-      setSugs(list); setDrop(list.length>0)
-    } catch{}
+      const list = d.suggestions || []
+      setSugs(list); setDrop(list.length > 0)
+    } catch {}
   }
 
   function onQ(e) {
-    const v=e.target.value; setQuery(v); setPicked(false)
-    setName('');setGUrl('');setPid('');setSlug('')
-    setPStatus(null);setHistory([]);setLogSt(null)
-    setAddSt(null);setAddErr('')
+    const v = e.target.value; setQuery(v); setPicked(false)
+    setBName(''); setGUrl(''); setPid(''); setSlug('')
+    setPSt(null); setHist([]); setLogSt(null)
+    setAddSt(null); setAddErr('')
     clearTimeout(dbc.current)
-    dbc.current=setTimeout(()=>fetchSugs(v),300)
+    dbc.current = setTimeout(() => fetchSugs(v), 300)
   }
 
   function pick(sug) {
-    const pred=sug.placePrediction
-    const n=pred?.structuredFormat?.mainText?.text||pred?.text?.text||''
-    const id=pred?.placeId||''
-    const full=pred?.text?.text||''
-    const city=extractCity(full,n)
-    const auto=city?toSlug(n)+'-'+toSlug(city):toSlug(n)
-    setName(n); setGUrl(`https://search.google.com/local/writereview?placeid=${id}`)
+    const pred = sug.placePrediction
+    const n    = pred?.structuredFormat?.mainText?.text || pred?.text?.text || ''
+    const id   = pred?.placeId || ''
+    const full = pred?.text?.text || ''
+    const city = extractCity(full, n)
+    const auto = city ? toSlug(n) + '-' + toSlug(city) : toSlug(n)
+    setBName(n); setGUrl(`https://search.google.com/local/writereview?placeid=${id}`)
     setPid(id); setSlug(auto); setQuery(n); setPicked(true)
     setSugs([]); setDrop(false)
-    setHistory([]);setLogSt(null);setOutcome('');setAddSt(null);setAddErr('')
+    setHist([]); setLogSt(null); setOutcome(''); setAddSt(null); setAddErr('')
     checkPitch(id)
   }
 
   async function checkPitch(id) {
-    setPStatus('checking')
+    setPSt('checking')
     try {
-      const r=await fetch(`/api/check-pitch?placeId=${encodeURIComponent(id)}`)
-      const d=await r.json()
-      setPStatus(d.status)
-      if(d.pitches) setHistory(d.pitches)
-    } catch { setPStatus('new') }
+      const r = await fetch(`/api/check-pitch?placeId=${encodeURIComponent(id)}`)
+      const d = await r.json()
+      setPSt(d.status)
+      if (d.pitches) setHist(d.pitches)
+    } catch { setPSt('new') }
   }
 
   async function logVisit() {
-    if(!rep.trim()||!outcome) return
+    if (!rep.trim() || !outcome) return
     setLogSt('loading')
     try {
-      const r=await fetch('/api/log-pitch',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({place_id:pid,business_name:name,visited_by:rep.trim(),outcome,password:pw}),
+      const r = await fetch('/api/log-pitch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ place_id: pid, business_name: bName, visited_by: rep.trim(), outcome, password: pw }),
       })
-      if(r.ok){
+      if (r.ok) {
         setLogSt('logged')
-        setHistory(prev=>[{visited_by:rep.trim(),outcome,visited_at:new Date().toISOString()},...prev])
-        if(pStatus==='new') setPStatus('pitched')
+        setHist(prev => [{ visited_by: rep.trim(), outcome, visited_at: new Date().toISOString() }, ...prev])
+        if (pSt === 'new') setPSt('pitched')
       } else setLogSt('error')
-    } catch {setLogSt('error')}
+    } catch { setLogSt('error') }
   }
 
   async function login(e) {
     e.preventDefault()
-    const r=await fetch('/api/admin-auth',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({password:pw}),
+    const r = await fetch('/api/admin-auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
     })
-    if(r.ok){setAuthed(true);setPwErr('')} else setPwErr('Incorrect password.')
+    if (r.ok) { setAuthed(true); setPwErr('') } else setPwErr('Incorrect password — try again.')
   }
 
   async function addClient(e) {
     e.preventDefault()
-    if(!name||!gUrl||!slug) return
-    setAddSt('loading');setAddErr('')
-    const r=await fetch('/api/add-client',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({slug,client_name:name,google_url:gUrl,password:pw}),
+    if (!bName || !gUrl || !slug) return
+    setAddSt('loading'); setAddErr('')
+    const r = await fetch('/api/add-client', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug, client_name: bName, google_url: gUrl, password: pw }),
     })
-    const d=await r.json()
-    if(r.ok){setAddSt('success');setResult({slug,cardUrl:`https://${DOMAIN}/${slug}`})}
-    else{setAddSt('error');setAddErr(d.error||'Something went wrong.')}
+    const d = await r.json()
+    if (r.ok) { setAddSt('success'); setResult({ slug, cardUrl: `https://${DOMAIN}/${slug}` }) }
+    else { setAddSt('error'); setAddErr(d.error || 'Something went wrong.') }
   }
 
-  async function copy() {
-    if(!result) return
+  async function copyUrl() {
+    if (!result) return
     await navigator.clipboard.writeText(result.cardUrl)
-    setCopied(true); setTimeout(()=>setCopied(false),2000)
+    setCopied(true); setTimeout(() => setCopied(false), 2200)
   }
 
   function reset() {
-    setAddSt(null);setResult(null);setAddErr('');setCopied(false)
-    setPicked(false);setQuery('');setName('');setGUrl('');setPid('');setSlug('')
-    setPStatus(null);setHistory([]);setLogSt(null);setRep('');setOutcome('')
+    setAddSt(null); setResult(null); setAddErr(''); setCopied(false)
+    setPicked(false); setQuery(''); setBName(''); setGUrl(''); setPid(''); setSlug('')
+    setPSt(null); setHist([]); setLogSt(null); setRep(''); setOutcome('')
   }
 
-  const canAdd = picked && slug.trim() && pStatus!=='checking' && addSt!=='loading'
+  const canAdd = picked && slug.trim() && pSt !== 'checking' && addSt !== 'loading'
 
-  /* ── render ──────────────────────────────────────────────────────────── */
+  /* ── page shell ──────────────────────────────────────────────────────── */
   return (
     <div style={{
-      minHeight:'100vh',
-      background:NAVY,
-      backgroundImage:'radial-gradient(ellipse 80% 35% at 50% 0%,rgba(196,165,53,.17) 0%,transparent 65%)',
-      fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif",
-      WebkitFontSmoothing:'antialiased',
-      display:'flex', flexDirection:'column', alignItems:'center',
-      padding:'32px 16px 64px',
+      minHeight: '100vh',
+      background: NAVY,
+      backgroundImage: [
+        'radial-gradient(ellipse 90% 40% at 50% -5%, rgba(196,165,53,.2) 0%, transparent 65%)',
+        'radial-gradient(ellipse 50% 30% at 0% 100%, rgba(20,30,70,.8) 0%, transparent 60%)',
+      ].join(','),
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      WebkitFontSmoothing: 'antialiased',
+      MozOsxFontSmoothing: 'grayscale',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      padding: '28px 16px 72px',
     }}>
+
       <style>{`
-        .i:focus{border-color:${GOLD}!important;background:#fff!important;box-shadow:0 0 0 3px rgba(196,165,53,.14)!important}
-        .dr:active{background:#F4F4F7!important}
-        button:active{opacity:.8}
+        .fi:focus {
+          border-color: ${GOLD} !important;
+          background: #fff !important;
+          box-shadow: 0 0 0 3px rgba(196,165,53,.13) !important;
+        }
+        .dr-row { cursor: pointer; transition: background .1s; }
+        .dr-row:hover, .dr-row:active { background: #F6F6FA !important; }
+        .pbtn:not(:disabled):active { opacity: .82; transform: scale(.99); }
+        .gbtn:not(:disabled):active { background: #F4F4F8 !important; }
       `}</style>
 
-      {/* ── brand ─────────────────────────────────────────────────── */}
+      {/* brand row */}
       <div style={{
-        display:'flex',alignItems:'center',justifyContent:'space-between',
-        width:'100%',maxWidth:400,marginBottom:20,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        width: '100%', maxWidth: 390, marginBottom: 18,
       }}>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
-            width:36,height:36,borderRadius:10,flexShrink:0,
-            background:'linear-gradient(145deg,#D4AA40,#8A6800)',
-            display:'flex',alignItems:'center',justifyContent:'center',
-            fontWeight:800,fontSize:16,color:'#fff',
-            boxShadow:'0 4px 12px rgba(196,165,53,.45)',
+            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+            background: 'linear-gradient(145deg, #D4AA40, #8C6E00)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontWeight: 800, fontSize: 16, color: '#fff',
+            boxShadow: '0 4px 14px rgba(196,165,53,.5)',
           }}>A</div>
           <div>
-            <div style={{color:'#fff',fontWeight:700,fontSize:14,letterSpacing:-.2}}>Apex Tap Cards</div>
-            <div style={{color:'rgba(255,255,255,.35)',fontSize:11,letterSpacing:.5,textTransform:'uppercase'}}>Admin</div>
+            <div style={{ color: '#fff', fontWeight: 700, fontSize: 14, letterSpacing: -.2, lineHeight: 1.2 }}>
+              Apex Tap Cards
+            </div>
+            <div style={{ color: 'rgba(255,255,255,.32)', fontSize: 11, letterSpacing: .6, textTransform: 'uppercase', marginTop: 1 }}>
+              Admin
+            </div>
           </div>
         </div>
         {authed && (
           <div style={{
-            display:'flex',alignItems:'center',gap:6,
-            background:'rgba(196,165,53,.1)',border:'1px solid rgba(196,165,53,.2)',
-            borderRadius:20,padding:'4px 10px',
-            color:GOLD,fontSize:11,fontWeight:700,letterSpacing:.7,
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'rgba(196,165,53,.1)', border: '1px solid rgba(196,165,53,.22)',
+            borderRadius: 20, padding: '5px 11px',
+            color: GOLD, fontSize: 11, fontWeight: 700, letterSpacing: .8,
           }}>
-            <div style={{width:5,height:5,borderRadius:'50%',background:GOLD,boxShadow:`0 0 6px ${GOLD}`}}/>
+            <div style={{
+              width: 6, height: 6, borderRadius: '50%', background: GOLD,
+              boxShadow: `0 0 7px ${GOLD}`,
+            }} />
             LIVE
           </div>
         )}
       </div>
 
-      {/* ── card ──────────────────────────────────────────────────── */}
+      {/* card */}
       <div style={{
-        width:'100%',maxWidth:400,
-        background:'#fff',borderRadius:20,
-        padding:'28px 22px',
-        boxShadow:'0 20px 60px rgba(0,0,0,.55)',
+        width: '100%', maxWidth: 390,
+        background: '#fff',
+        borderRadius: 20,
+        padding: '28px 22px 26px',
+        boxShadow: '0 24px 64px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.06)',
       }}>
 
-        {/* LOGIN */}
+        {/* ══ LOGIN ══════════════════════════════════════════════════ */}
         {!authed && (
           <form onSubmit={login}>
-            <div style={{fontSize:22,fontWeight:800,color:NAVY,letterSpacing:-.5,marginBottom:4}}>Sign in</div>
-            <div style={{fontSize:14,color:'#999',marginBottom:22}}>Access the Apex admin portal</div>
-            <Label>Password</Label>
-            <Input type="password" placeholder="••••••••" value={pw} onChange={e=>setPw(e.target.value)} autoFocus style={{marginBottom:12}}/>
+            <div style={{ fontSize: 24, fontWeight: 800, color: NAVY, letterSpacing: -.6, marginBottom: 3 }}>
+              Welcome back
+            </div>
+            <div style={{ fontSize: 14, color: '#9090A4', marginBottom: 26, lineHeight: 1.4 }}>
+              Sign in to your Apex admin portal
+            </div>
+
+            <SectionLabel>Password</SectionLabel>
+            <div style={{ position: 'relative', marginBottom: 14 }}>
+              <input
+                className="fi"
+                style={{ ...baseInput, paddingRight: 56 }}
+                type={showPw ? 'text' : 'password'}
+                placeholder="Enter your password"
+                value={pw}
+                onChange={e => setPw(e.target.value)}
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw(!showPw)}
+                style={{
+                  position: 'absolute', right: 0, top: 0, bottom: 0,
+                  width: 52, background: 'none', border: 'none',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#9090A4', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+                  letterSpacing: .3,
+                }}
+              >
+                {showPw ? 'Hide' : 'Show'}
+              </button>
+            </div>
+
             {pwErr && (
-              <div style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:10,
-                padding:'10px 14px',color:'#DC2626',fontSize:13,fontWeight:500,marginBottom:12}}>
+              <div style={{
+                background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 10,
+                padding: '11px 14px', color: '#B91C1C', fontSize: 14, fontWeight: 500, marginBottom: 14,
+              }}>
                 {pwErr}
               </div>
             )}
-            <Btn gold type="submit">Sign In</Btn>
+
+            <PrimaryBtn className="pbtn" type="submit">Sign In</PrimaryBtn>
           </form>
         )}
 
-        {/* SUCCESS */}
-        {authed && addSt==='success' && result && (
-          <div style={{textAlign:'center'}}>
+        {/* ══ SUCCESS ════════════════════════════════════════════════ */}
+        {authed && addSt === 'success' && result && (
+          <div style={{ textAlign: 'center', padding: '4px 0' }}>
             <div style={{
-              width:68,height:68,borderRadius:'50%',
-              background:'linear-gradient(135deg,#D4AA40,#8A6800)',
-              display:'flex',alignItems:'center',justifyContent:'center',
-              fontSize:30,color:'#fff',margin:'0 auto 18px',
-              boxShadow:'0 8px 24px rgba(196,165,53,.45)',
+              width: 72, height: 72, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #D4AA40, #8C6E00)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 32, color: '#fff', margin: '0 auto 20px',
+              boxShadow: '0 10px 30px rgba(196,165,53,.45)',
             }}>✓</div>
-            <div style={{fontSize:20,fontWeight:800,color:NAVY,letterSpacing:-.4,marginBottom:6}}>{name} is live!</div>
-            <div style={{fontSize:14,color:'#999',marginBottom:20}}>Program each NFC card with this URL</div>
+
+            <div style={{ fontSize: 21, fontWeight: 800, color: NAVY, letterSpacing: -.5, marginBottom: 6 }}>
+              {bName} is live!
+            </div>
+            <div style={{ fontSize: 14, color: '#9090A4', marginBottom: 22, lineHeight: 1.4 }}>
+              Program each card with this URL
+            </div>
+
             <div style={{
-              background:NAVY,borderRadius:12,padding:'14px',
-              fontFamily:'monospace',fontSize:13,color:GOLD,fontWeight:700,
-              wordBreak:'break-all',lineHeight:1.5,marginBottom:16,
-              border:'1px solid rgba(196,165,53,.15)',
-            }}>{result.cardUrl}</div>
-            <Btn gold onClick={copy} style={{marginBottom:10,
-              background:copied?'linear-gradient(135deg,#22C55E,#16A34A)':undefined,
-              boxShadow:copied?'0 4px 16px rgba(34,197,94,.4)':undefined}}>
-              {copied?'✓ Copied!':'Copy URL'}
-            </Btn>
-            <Btn onClick={reset}>Add Another</Btn>
+              background: NAVY, borderRadius: 13,
+              padding: '14px 16px', marginBottom: 18,
+              fontFamily: "'SF Mono', 'Fira Mono', monospace",
+              fontSize: 13, color: GOLD, fontWeight: 700,
+              wordBreak: 'break-all', lineHeight: 1.6,
+              border: '1px solid rgba(196,165,53,.15)',
+            }}>
+              {result.cardUrl}
+            </div>
+
+            <PrimaryBtn
+              className="pbtn"
+              onClick={copyUrl}
+              style={{
+                marginBottom: 10,
+                background: copied
+                  ? 'linear-gradient(135deg,#22C55E,#15803D)'
+                  : undefined,
+                boxShadow: copied
+                  ? '0 4px 18px rgba(34,197,94,.35)'
+                  : undefined,
+              }}
+            >
+              {copied ? '✓  Copied to clipboard' : 'Copy URL'}
+            </PrimaryBtn>
+            <GhostBtn className="gbtn" onClick={reset}>Add Another Client</GhostBtn>
           </div>
         )}
 
-        {/* MAIN FORM */}
-        {authed && addSt!=='success' && (
+        {/* ══ MAIN FORM ══════════════════════════════════════════════ */}
+        {authed && addSt !== 'success' && (
           <form onSubmit={addClient}>
 
-            {/* search */}
-            <Label>Search Business</Label>
-            <div style={{position:'relative',marginBottom:16}}>
+            {/* — Search — */}
+            <SectionLabel>Search Business</SectionLabel>
+            <div style={{ position: 'relative', marginBottom: 16 }}>
               <span style={{
-                position:'absolute',left:13,top:'50%',transform:'translateY(-50%)',
-                fontSize:17,color:picked?GOLD:'#C0C0CC',pointerEvents:'none',
-                transition:'color .15s',lineHeight:1,
+                position: 'absolute', left: 13, top: '50%', transform: 'translateY(-52%)',
+                fontSize: 18, lineHeight: 1, pointerEvents: 'none',
+                color: picked ? GOLD : '#BBBBC8',
+                transition: 'color .15s',
               }}>⌕</span>
-              <Input
-                className="i"
+              <input
+                className="fi"
+                style={{ ...baseInput, paddingLeft: 40 }}
                 type="text"
                 placeholder="Business name..."
                 value={query}
                 onChange={onQ}
-                onFocus={()=>{if(sugs.length>0)setDrop(true)}}
-                onBlur={()=>{if(!inDrop.current)setDrop(false)}}
-                autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-                style={{paddingLeft:40}}
+                onFocus={() => { if (sugs.length > 0) setDrop(true) }}
+                onBlur={() => { if (!inDrop.current) setDrop(false) }}
+                autoComplete="off" autoCorrect="off"
+                autoCapitalize="off" spellCheck="false"
               />
-              {drop && sugs.length>0 && (
+
+              {drop && sugs.length > 0 && (
                 <div
-                  onMouseDown={()=>{inDrop.current=true}}
-                  onMouseUp={()=>{inDrop.current=false}}
-                  onTouchStart={()=>{inDrop.current=true}}
-                  onTouchEnd={()=>{inDrop.current=false}}
+                  onMouseDown={() => { inDrop.current = true }}
+                  onMouseUp={() => { inDrop.current = false }}
+                  onTouchStart={() => { inDrop.current = true }}
+                  onTouchEnd={() => { inDrop.current = false }}
                   style={{
-                    position:'absolute',top:'calc(100% + 6px)',left:0,right:0,
-                    background:'#fff',borderRadius:14,zIndex:999,
-                    boxShadow:'0 8px 30px rgba(0,0,0,.13),0 0 0 1px rgba(0,0,0,.05)',
-                    overflow:'hidden',
+                    position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
+                    background: '#fff', borderRadius: 14, zIndex: 999,
+                    boxShadow: '0 10px 36px rgba(0,0,0,.14), 0 0 0 1px rgba(0,0,0,.05)',
+                    overflow: 'hidden',
                   }}
                 >
-                  {sugs.map((s,i)=>{
-                    const p=s.placePrediction
-                    const main=p?.structuredFormat?.mainText?.text||p?.text?.text||''
-                    const sec=p?.structuredFormat?.secondaryText?.text||''
+                  {sugs.map((s, i) => {
+                    const p    = s.placePrediction
+                    const main = p?.structuredFormat?.mainText?.text || p?.text?.text || ''
+                    const sec  = p?.structuredFormat?.secondaryText?.text || ''
                     return (
-                      <div key={i} className="dr"
-                        onMouseDown={e=>{e.preventDefault();pick(s)}}
-                        onTouchEnd={e=>{e.preventDefault();pick(s)}}
+                      <div
+                        key={i}
+                        className="dr-row"
+                        onMouseDown={e => { e.preventDefault(); pick(s) }}
+                        onTouchEnd={e => { e.preventDefault(); pick(s) }}
                         style={{
-                          padding:'12px 14px',cursor:'pointer',
-                          borderBottom:i<sugs.length-1?'1px solid #F0F0F4':'none',
-                          minHeight:52,display:'flex',flexDirection:'column',justifyContent:'center',
-                        }}>
-                        <div style={{fontSize:15,fontWeight:600,color:'#111',lineHeight:1.3}}>{main}</div>
-                        {sec&&<div style={{fontSize:12,color:'#AAA',marginTop:2,lineHeight:1.3}}>{sec}</div>}
+                          padding: '13px 15px', background: '#fff',
+                          borderBottom: i < sugs.length - 1 ? '1px solid #F0F0F6' : 'none',
+                          minHeight: 54, display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                        }}
+                      >
+                        <div style={{ fontSize: 15, fontWeight: 600, color: '#111', lineHeight: 1.3 }}>{main}</div>
+                        {sec && <div style={{ fontSize: 12, color: '#A0A0B4', marginTop: 2, lineHeight: 1.3 }}>{sec}</div>}
                       </div>
                     )
                   })}
@@ -379,100 +465,178 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* status */}
-            {pStatus==='checking' && (
-              <StatusPill color="#999" bg="#F7F7FA" border="#EEEEF4" dot="#D0D0DC">
-                Checking...
-              </StatusPill>
+            {/* — Pitch status — */}
+            {pSt === 'checking' && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 9,
+                background: '#F6F6FA', border: '1px solid #EEEEF6',
+                borderRadius: 11, padding: '12px 14px', marginBottom: 16,
+                fontSize: 14, color: '#9090A4',
+              }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#CCCCD8', flexShrink: 0 }} />
+                Checking status...
+              </div>
             )}
-            {pStatus==='new' && (
-              <StatusPill color="#15803D" bg="#F0FDF4" border="#BBF7D0" dot="#22C55E">
-                New lead — never visited
-              </StatusPill>
+
+            {pSt === 'new' && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 9,
+                background: '#F0FDF4', border: '1px solid #BBF7D0',
+                borderRadius: 11, padding: '12px 14px', marginBottom: 16,
+                fontSize: 14, color: '#166534', fontWeight: 600,
+              }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
+                New lead — never been visited
+              </div>
             )}
-            {pStatus==='pitched' && (
-              <div style={{background:'#FFFBEB',border:'1px solid #FDE68A',borderRadius:12,padding:'12px 14px',marginBottom:16}}>
-                <div style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:'#92400E',fontWeight:700,marginBottom:history.length?10:0}}>
-                  <div style={{width:8,height:8,borderRadius:'50%',background:'#F59E0B',flexShrink:0}}/>
+
+            {pSt === 'pitched' && (
+              <div style={{
+                background: '#FFFBEB', border: '1px solid #FDE68A',
+                borderRadius: 11, padding: '12px 14px', marginBottom: 16,
+              }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 9,
+                  fontSize: 14, color: '#92400E', fontWeight: 700,
+                  marginBottom: hist.length ? 10 : 0,
+                }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
                   Already visited
                 </div>
-                {history.map((h,i)=>(
-                  <div key={i} style={{borderTop:'1px solid rgba(253,230,138,.7)',paddingTop:7,marginTop:7,fontSize:13,color:'#78350F',lineHeight:1.6}}>
-                    <b>{h.visited_by}</b> · {OUTCOMES[h.outcome]||h.outcome} · <span style={{color:'#A16207'}}>{fmtDate(h.visited_at)}</span>
+                {hist.map((h, i) => (
+                  <div key={i} style={{
+                    borderTop: '1px solid rgba(253,230,138,.7)',
+                    paddingTop: 8, marginTop: 8,
+                    fontSize: 13, color: '#78350F', lineHeight: 1.7,
+                  }}>
+                    <strong>{h.visited_by}</strong>
+                    <span style={{ color: '#A16207' }}> · {OUTCOMES[h.outcome] || h.outcome} · {fmtDate(h.visited_at)}</span>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* log visit */}
-            {picked && (pStatus==='new'||pStatus==='pitched') && logSt!=='logged' && (
-              <div style={{background:'#F7F7FA',borderRadius:14,padding:'16px 14px',marginBottom:16,border:'1px solid #EEEEF4'}}>
-                <Label>Log This Visit</Label>
-                <Input type="text" placeholder="Your name" value={rep} onChange={e=>setRep(e.target.value)}
-                  style={{marginBottom:8,background:'#fff'}}/>
-                <div style={{position:'relative',marginBottom:10}}>
-                  <select className="i" value={outcome} onChange={e=>setOutcome(e.target.value)}
-                    style={{...inp,background:'#fff',paddingRight:34,cursor:'pointer',color:outcome?'#111':'#AAA'}}>
+            {/* — Log visit — */}
+            {picked && (pSt === 'new' || pSt === 'pitched') && logSt !== 'logged' && (
+              <>
+                <Divider />
+                <SectionLabel>Log This Visit</SectionLabel>
+                <input
+                  className="fi"
+                  style={{ ...baseInput, marginBottom: 8 }}
+                  type="text"
+                  placeholder="Your name"
+                  value={rep}
+                  onChange={e => setRep(e.target.value)}
+                />
+                <div style={{ position: 'relative', marginBottom: 12 }}>
+                  <select
+                    className="fi"
+                    style={{ ...baseInput, paddingRight: 36, cursor: 'pointer', color: outcome ? '#0A0D1A' : '#A0A0B4' }}
+                    value={outcome}
+                    onChange={e => setOutcome(e.target.value)}
+                  >
                     <option value="">Select outcome...</option>
                     <option value="pitched">Pitched — Awaiting Decision</option>
                     <option value="not_interested">Not Interested</option>
                     <option value="follow_up">Follow-Up Scheduled</option>
                     <option value="sold">Sold ✓</option>
                   </select>
-                  <span style={{position:'absolute',right:13,top:'50%',transform:'translateY(-50%)',pointerEvents:'none',color:'#AAA',fontSize:11}}>▼</span>
+                  <span style={{
+                    position: 'absolute', right: 13, top: '50%', transform: 'translateY(-50%)',
+                    pointerEvents: 'none', color: '#BBBBC8', fontSize: 10,
+                  }}>▼</span>
                 </div>
-                <Btn onClick={logVisit}
-                  disabled={!rep.trim()||!outcome||logSt==='loading'}
-                  style={{background:'#fff',border:'1.5px solid #DDDDE8',color:'#444',boxShadow:'none'}}>
-                  {logSt==='loading'?'Logging...':'Log Visit'}
-                </Btn>
-                {logSt==='error'&&<div style={{color:'#DC2626',fontSize:13,marginTop:8}}>Failed — try again.</div>}
-              </div>
-            )}
-            {logSt==='logged' && (
-              <div style={{display:'flex',alignItems:'center',gap:8,background:'#F0FDF4',
-                border:'1px solid #BBF7D0',borderRadius:12,padding:'11px 14px',marginBottom:16,
-                fontSize:14,color:'#15803D',fontWeight:600}}>
-                <span style={{width:18,height:18,borderRadius:'50%',background:'#22C55E',
-                  color:'#fff',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✓</span>
-                Visit logged
-              </div>
+                <GhostBtn
+                  className="gbtn"
+                  onClick={logVisit}
+                  disabled={!rep.trim() || !outcome || logSt === 'loading'}
+                >
+                  {logSt === 'loading' ? 'Logging...' : 'Log Visit'}
+                </GhostBtn>
+                {logSt === 'error' && (
+                  <div style={{ color: '#DC2626', fontSize: 13, marginTop: 8, fontWeight: 500 }}>
+                    Failed — try again.
+                  </div>
+                )}
+              </>
             )}
 
-            {/* add client */}
-            {picked && pStatus!=='checking' && (
-              <div style={{background:'#F7F7FA',borderRadius:14,padding:'16px 14px',border:'1px solid #EEEEF4'}}>
-                <Label>Add as Client</Label>
-                <div style={{fontSize:14,color:'#15803D',fontWeight:600,marginBottom:14,display:'flex',alignItems:'center',gap:7}}>
-                  <span style={{width:16,height:16,borderRadius:'50%',background:'#22C55E',color:'#fff',
-                    fontSize:9,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✓</span>
-                  {name}
+            {logSt === 'logged' && (
+              <>
+                <Divider />
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  background: '#F0FDF4', border: '1px solid #BBF7D0',
+                  borderRadius: 11, padding: '12px 14px',
+                  fontSize: 14, color: '#166534', fontWeight: 600,
+                }}>
+                  <span style={{
+                    width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                    background: '#22C55E', color: '#fff', fontSize: 10,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>✓</span>
+                  Visit logged successfully
                 </div>
-                <Label>URL Slug</Label>
-                <Input type="text" value={slug}
-                  onChange={e=>setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,''))}
-                  style={{fontFamily:'monospace',letterSpacing:.3,background:'#fff',marginBottom:10}}/>
-                <div style={{background:NAVY,borderRadius:10,padding:'10px 12px',marginBottom:14,
-                  fontFamily:'monospace',fontSize:13,wordBreak:'break-all',lineHeight:1.5,
-                  border:'1px solid rgba(196,165,53,.12)'}}>
-                  <span style={{color:'rgba(255,255,255,.3)'}}>{DOMAIN}/</span>
-                  <span style={{color:GOLD,fontWeight:700}}>{slug||'...'}</span>
+              </>
+            )}
+
+            {/* — Add client — */}
+            {picked && pSt !== 'checking' && (
+              <>
+                <Divider />
+                <SectionLabel>Add as Client</SectionLabel>
+
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  fontSize: 14, fontWeight: 600, color: '#166534', marginBottom: 16,
+                }}>
+                  <span style={{
+                    width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                    background: '#22C55E', color: '#fff', fontSize: 10,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>✓</span>
+                  {bName}
                 </div>
-                {addSt==='error' && (
-                  <div style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:10,
-                    padding:'10px 13px',color:'#DC2626',fontSize:13,fontWeight:500,marginBottom:12}}>
+
+                <SectionLabel>Card URL Slug</SectionLabel>
+                <input
+                  className="fi"
+                  style={{ ...baseInput, fontFamily: "'SF Mono','Fira Mono',monospace", letterSpacing: .4, marginBottom: 10 }}
+                  type="text"
+                  value={slug}
+                  onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                />
+
+                {/* URL preview */}
+                <div style={{
+                  background: NAVY, borderRadius: 11,
+                  padding: '12px 14px', marginBottom: 18,
+                  fontFamily: "'SF Mono','Fira Mono',monospace",
+                  fontSize: 13, lineHeight: 1.5, wordBreak: 'break-all',
+                  border: '1px solid rgba(196,165,53,.12)',
+                }}>
+                  <span style={{ color: 'rgba(255,255,255,.28)' }}>{DOMAIN}/</span>
+                  <span style={{ color: GOLD, fontWeight: 700 }}>{slug || '...'}</span>
+                </div>
+
+                {addSt === 'error' && (
+                  <div style={{
+                    background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 10,
+                    padding: '11px 14px', color: '#B91C1C', fontSize: 14, fontWeight: 500, marginBottom: 14,
+                  }}>
                     {addErr}
                   </div>
                 )}
-                <Btn gold type="submit" disabled={!canAdd}>
-                  {addSt==='loading'?'Adding...':'Add Client'}
-                </Btn>
-              </div>
+
+                <PrimaryBtn className="pbtn" type="submit" disabled={!canAdd}>
+                  {addSt === 'loading' ? 'Adding...' : 'Add Client'}
+                </PrimaryBtn>
+              </>
             )}
 
           </form>
         )}
-
       </div>
     </div>
   )
