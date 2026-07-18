@@ -1,713 +1,478 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 
 const DOMAIN = 'go.apextapcards.com'
-const GOLD = '#C8A84B'
+const GOLD   = '#C4A535'
+const NAVY   = '#09101F'
 
 const OUTCOMES = {
-  pitched: 'Pitched — Awaiting Decision',
-  not_interested: 'Not Interested',
-  follow_up: 'Follow-Up Scheduled',
-  sold: 'Sold',
+  pitched:      'Pitched — Awaiting Decision',
+  not_interested:'Not Interested',
+  follow_up:    'Follow-Up Scheduled',
+  sold:         'Sold',
 }
 
-function toSlug(str) {
-  return str.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-')
+function toSlug(s) {
+  return s.toLowerCase().replace(/[^a-z0-9\s-]/g,'').trim().replace(/\s+/g,'-')
 }
 
-function extractCity(fullText, businessName) {
-  let text = fullText || ''
-  if (businessName && text.toLowerCase().startsWith(businessName.toLowerCase())) {
-    text = text.slice(businessName.length).replace(/^[,\s]+/, '')
-  }
-  const parts = text.split(',').map(p => p.trim()).filter(Boolean)
-  const provIdx = parts.findIndex(p => /^[A-Z]{2}(\s|$)/.test(p))
-  const limit = provIdx > 0 ? provIdx : parts.length
-  for (let i = 0; i < limit; i++) {
-    if (parts[i] && !/^\d/.test(parts[i])) return parts[i]
-  }
+function extractCity(full, name) {
+  let t = full || ''
+  if (name && t.toLowerCase().startsWith(name.toLowerCase()))
+    t = t.slice(name.length).replace(/^[,\s]+/,'')
+  const parts = t.split(',').map(p=>p.trim()).filter(Boolean)
+  const pi = parts.findIndex(p=>/^[A-Z]{2}(\s|$)/.test(p))
+  const lim = pi > 0 ? pi : parts.length
+  for (let i=0;i<lim;i++) if (parts[i] && !/^\d/.test(parts[i])) return parts[i]
   return ''
 }
 
-function fmt(dateStr) {
-  return new Date(dateStr).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })
+function fmtDate(d) {
+  return new Date(d).toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'})
 }
 
-// ─── Shared UI pieces ────────────────────────────────────────────────────────
+/* ─── tiny shared components ─────────────────────────────────────────────── */
 
-function Field({ label, children }) {
+const inp = {
+  display:'block', width:'100%', height:50, padding:'0 14px',
+  borderRadius:12, border:'1.5px solid #E4E4EC',
+  fontSize:16, color:'#111', background:'#F8F8FB',
+  boxSizing:'border-box', fontFamily:'inherit',
+  outline:'none', WebkitAppearance:'none', appearance:'none',
+}
+
+function Input(props) {
+  return <input className="i" style={inp} {...props} />
+}
+
+function Btn({ gold, disabled, children, ...rest }) {
   return (
-    <div style={{ marginBottom: 16 }}>
-      {label && (
-        <div style={{
-          fontSize: 11, fontWeight: 700, color: '#8A8A9A',
-          textTransform: 'uppercase', letterSpacing: '0.9px', marginBottom: 7,
-        }}>{label}</div>
-      )}
+    <button
+      style={{
+        width:'100%', height:52, borderRadius:13, border:'none',
+        background: disabled ? '#EDEDF0'
+                  : gold     ? `linear-gradient(135deg,#D4AA40,#8A6800)`
+                  :            'transparent',
+        color: disabled ? '#B8B8C0' : gold ? '#fff' : '#555',
+        border: (!gold && !disabled) ? '1.5px solid #DDDDE8' : 'none',
+        fontSize:16, fontWeight:700, cursor: disabled ? 'not-allowed':'pointer',
+        boxShadow: (gold && !disabled) ? '0 4px 16px rgba(196,165,53,.38)' : 'none',
+        fontFamily:'inherit', transition:'opacity .15s',
+      }}
+      disabled={disabled}
+      {...rest}
+    >
+      {children}
+    </button>
+  )
+}
+
+function Label({ children }) {
+  return (
+    <div style={{fontSize:11,fontWeight:700,color:'#909098',
+      textTransform:'uppercase',letterSpacing:'1px',marginBottom:7}}>
       {children}
     </div>
   )
 }
 
-function GoldButton({ children, disabled, type = 'button', onClick, style = {} }) {
+function StatusPill({ color, bg, border, dot, children }) {
   return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        width: '100%',
-        height: 54,
-        borderRadius: 14,
-        border: 'none',
-        background: disabled
-          ? '#EBEBEB'
-          : `linear-gradient(135deg, #D4AA50 0%, #9A7200 100%)`,
-        color: disabled ? '#B0B0B0' : '#fff',
-        fontSize: 16,
-        fontWeight: 700,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        letterSpacing: 0.2,
-        boxShadow: disabled ? 'none' : '0 4px 18px rgba(200,168,75,0.4)',
-        transition: 'opacity 0.15s',
-        fontFamily: 'inherit',
-        ...style,
-      }}
-    >
+    <div style={{
+      display:'flex',alignItems:'center',gap:9,
+      background:bg, border:`1px solid ${border}`,
+      borderRadius:12,padding:'12px 14px',
+      fontSize:14,color,fontWeight:600,marginBottom:16,
+    }}>
+      <div style={{width:8,height:8,borderRadius:'50%',background:dot,flexShrink:0}}/>
       {children}
-    </button>
+    </div>
   )
 }
 
-function OutlineButton({ children, onClick, style = {} }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        width: '100%',
-        height: 50,
-        borderRadius: 14,
-        border: '1.5px solid #E0E0E0',
-        background: 'transparent',
-        color: '#555',
-        fontSize: 15,
-        fontWeight: 600,
-        cursor: 'pointer',
-        fontFamily: 'inherit',
-        ...style,
-      }}
-    >
-      {children}
-    </button>
-  )
-}
-
-// ─── Main component ──────────────────────────────────────────────────────────
+/* ─── page ────────────────────────────────────────────────────────────────── */
 
 export default function AdminPage() {
-  const [authed, setAuthed]         = useState(false)
-  const [password, setPassword]     = useState('')
-  const [pwError, setPwError]       = useState('')
+  const [authed,setAuthed]   = useState(false)
+  const [pw,setPw]           = useState('')
+  const [pwErr,setPwErr]     = useState('')
 
-  const [query, setQuery]           = useState('')
-  const [suggestions, setSuggestions] = useState([])
-  const [showDrop, setShowDrop]     = useState(false)
-  const [selected, setSelected]     = useState(false)
+  const [query,setQuery]     = useState('')
+  const [sugs,setSugs]       = useState([])
+  const [drop,setDrop]       = useState(false)
+  const [picked,setPicked]   = useState(false)
 
-  const [clientName, setClientName] = useState('')
-  const [googleUrl, setGoogleUrl]   = useState('')
-  const [placeId, setPlaceId]       = useState('')
-  const [slug, setSlug]             = useState('')
+  const [name,setName]       = useState('')
+  const [gUrl,setGUrl]       = useState('')
+  const [pid,setPid]         = useState('')
+  const [slug,setSlug]       = useState('')
 
-  const [pitchStatus, setPitchStatus]   = useState(null)  // null | checking | new | pitched
-  const [pitchHistory, setPitchHistory] = useState([])
-  const [repName, setRepName]           = useState('')
-  const [outcome, setOutcome]           = useState('')
-  const [logStatus, setLogStatus]       = useState(null)  // null | loading | logged | error
+  const [pStatus,setPStatus] = useState(null)
+  const [history,setHistory] = useState([])
+  const [rep,setRep]         = useState('')
+  const [outcome,setOutcome] = useState('')
+  const [logSt,setLogSt]     = useState(null)
 
-  const [addStatus, setAddStatus]   = useState(null)  // null | loading | success | error
-  const [addError, setAddError]     = useState('')
-  const [result, setResult]         = useState(null)
-  const [copied, setCopied]         = useState(false)
+  const [addSt,setAddSt]     = useState(null)
+  const [addErr,setAddErr]   = useState('')
+  const [result,setResult]   = useState(null)
+  const [copied,setCopied]   = useState(false)
 
-  const debounce  = useRef(null)
-  const inDrop    = useRef(false)
+  const dbc    = useRef(null)
+  const inDrop = useRef(false)
 
-  // ── Autocomplete ──────────────────────────────────────────────────────────
-
-  async function fetchSuggestions(input) {
-    if (input.length < 2) { setSuggestions([]); setShowDrop(false); return }
+  async function fetchSugs(v) {
+    if (v.length<2){setSugs([]);setDrop(false);return}
     try {
-      const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
-        },
-        body: JSON.stringify({ input, includedPrimaryTypes: ['establishment'] }),
+      const r = await fetch('https://places.googleapis.com/v1/places:autocomplete',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Goog-Api-Key':process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY},
+        body:JSON.stringify({input:v,includedPrimaryTypes:['establishment']}),
       })
-      const data = await res.json()
-      const list = data.suggestions || []
-      setSuggestions(list)
-      setShowDrop(list.length > 0)
-    } catch {}
+      const d = await r.json()
+      const list = d.suggestions||[]
+      setSugs(list); setDrop(list.length>0)
+    } catch{}
   }
 
-  function onQueryChange(e) {
-    const v = e.target.value
-    setQuery(v)
-    setSelected(false)
-    setClientName(''); setGoogleUrl(''); setPlaceId(''); setSlug('')
-    setPitchStatus(null); setPitchHistory([]); setLogStatus(null)
-    setAddStatus(null); setAddError('')
-    clearTimeout(debounce.current)
-    debounce.current = setTimeout(() => fetchSuggestions(v), 300)
+  function onQ(e) {
+    const v=e.target.value; setQuery(v); setPicked(false)
+    setName('');setGUrl('');setPid('');setSlug('')
+    setPStatus(null);setHistory([]);setLogSt(null)
+    setAddSt(null);setAddErr('')
+    clearTimeout(dbc.current)
+    dbc.current=setTimeout(()=>fetchSugs(v),300)
   }
 
-  function pickSuggestion(sug) {
-    const pred = sug.placePrediction
-    const name = pred?.structuredFormat?.mainText?.text || pred?.text?.text || ''
-    const id   = pred?.placeId || ''
-    const full = pred?.text?.text || ''
-    const city = extractCity(full, name)
-    const auto = city ? toSlug(name) + '-' + toSlug(city) : toSlug(name)
-
-    setClientName(name)
-    setGoogleUrl(`https://search.google.com/local/writereview?placeid=${id}`)
-    setPlaceId(id)
-    setSlug(auto)
-    setQuery(name)
-    setSelected(true)
-    setSuggestions([]); setShowDrop(false)
-    setPitchHistory([]); setLogStatus(null); setOutcome('')
-    setAddStatus(null); setAddError('')
-
+  function pick(sug) {
+    const pred=sug.placePrediction
+    const n=pred?.structuredFormat?.mainText?.text||pred?.text?.text||''
+    const id=pred?.placeId||''
+    const full=pred?.text?.text||''
+    const city=extractCity(full,n)
+    const auto=city?toSlug(n)+'-'+toSlug(city):toSlug(n)
+    setName(n); setGUrl(`https://search.google.com/local/writereview?placeid=${id}`)
+    setPid(id); setSlug(auto); setQuery(n); setPicked(true)
+    setSugs([]); setDrop(false)
+    setHistory([]);setLogSt(null);setOutcome('');setAddSt(null);setAddErr('')
     checkPitch(id)
   }
 
   async function checkPitch(id) {
-    setPitchStatus('checking')
+    setPStatus('checking')
     try {
-      const res  = await fetch(`/api/check-pitch?placeId=${encodeURIComponent(id)}`)
-      const data = await res.json()
-      setPitchStatus(data.status)
-      if (data.pitches) setPitchHistory(data.pitches)
-    } catch {
-      setPitchStatus('new')
-    }
+      const r=await fetch(`/api/check-pitch?placeId=${encodeURIComponent(id)}`)
+      const d=await r.json()
+      setPStatus(d.status)
+      if(d.pitches) setHistory(d.pitches)
+    } catch { setPStatus('new') }
   }
 
-  // ── Log visit ─────────────────────────────────────────────────────────────
-
-  async function handleLogVisit() {
-    if (!repName.trim() || !outcome) return
-    setLogStatus('loading')
+  async function logVisit() {
+    if(!rep.trim()||!outcome) return
+    setLogSt('loading')
     try {
-      const res = await fetch('/api/log-pitch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          place_id: placeId, business_name: clientName,
-          visited_by: repName.trim(), outcome, password,
-        }),
+      const r=await fetch('/api/log-pitch',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({place_id:pid,business_name:name,visited_by:rep.trim(),outcome,password:pw}),
       })
-      if (res.ok) {
-        setLogStatus('logged')
-        setPitchHistory(prev => [{ visited_by: repName.trim(), outcome, visited_at: new Date().toISOString() }, ...prev])
-        if (pitchStatus === 'new') setPitchStatus('pitched')
-      } else { setLogStatus('error') }
-    } catch { setLogStatus('error') }
+      if(r.ok){
+        setLogSt('logged')
+        setHistory(prev=>[{visited_by:rep.trim(),outcome,visited_at:new Date().toISOString()},...prev])
+        if(pStatus==='new') setPStatus('pitched')
+      } else setLogSt('error')
+    } catch {setLogSt('error')}
   }
 
-  // ── Login ─────────────────────────────────────────────────────────────────
-
-  async function handleLogin(e) {
+  async function login(e) {
     e.preventDefault()
-    const res = await fetch('/api/admin-auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+    const r=await fetch('/api/admin-auth',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({password:pw}),
     })
-    if (res.ok) { setAuthed(true); setPwError('') }
-    else setPwError('Wrong password.')
+    if(r.ok){setAuthed(true);setPwErr('')} else setPwErr('Incorrect password.')
   }
 
-  // ── Add client ────────────────────────────────────────────────────────────
-
-  async function handleAddClient(e) {
+  async function addClient(e) {
     e.preventDefault()
-    if (!clientName || !googleUrl || !slug) return
-    setAddStatus('loading'); setAddError('')
-    const res = await fetch('/api/add-client', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug, client_name: clientName, google_url: googleUrl, password }),
+    if(!name||!gUrl||!slug) return
+    setAddSt('loading');setAddErr('')
+    const r=await fetch('/api/add-client',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({slug,client_name:name,google_url:gUrl,password:pw}),
     })
-    const data = await res.json()
-    if (res.ok) {
-      setAddStatus('success')
-      setResult({ slug, cardUrl: `https://${DOMAIN}/${slug}` })
-    } else {
-      setAddStatus('error')
-      setAddError(data.error || 'Something went wrong.')
-    }
+    const d=await r.json()
+    if(r.ok){setAddSt('success');setResult({slug,cardUrl:`https://${DOMAIN}/${slug}`})}
+    else{setAddSt('error');setAddErr(d.error||'Something went wrong.')}
   }
 
-  async function copyUrl() {
-    if (!result) return
+  async function copy() {
+    if(!result) return
     await navigator.clipboard.writeText(result.cardUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopied(true); setTimeout(()=>setCopied(false),2000)
   }
 
   function reset() {
-    setAddStatus(null); setResult(null); setAddError(''); setCopied(false)
-    setSelected(false); setQuery('')
-    setClientName(''); setGoogleUrl(''); setPlaceId(''); setSlug('')
-    setPitchStatus(null); setPitchHistory([])
-    setLogStatus(null); setRepName(''); setOutcome('')
+    setAddSt(null);setResult(null);setAddErr('');setCopied(false)
+    setPicked(false);setQuery('');setName('');setGUrl('');setPid('');setSlug('')
+    setPStatus(null);setHistory([]);setLogSt(null);setRep('');setOutcome('')
   }
 
-  const canAdd = selected && slug.trim() && pitchStatus !== 'checking' && addStatus !== 'loading'
+  const canAdd = picked && slug.trim() && pStatus!=='checking' && addSt!=='loading'
 
-  // ─── Shared input style ───────────────────────────────────────────────────
-
-  const inp = {
-    width: '100%',
-    height: 50,
-    padding: '0 14px',
-    borderRadius: 12,
-    border: '1.5px solid #E2E2E8',
-    fontSize: 16,        // must be 16+ to prevent iOS zoom
-    color: '#111',
-    background: '#FAFAFA',
-    boxSizing: 'border-box',
-    fontFamily: 'inherit',
-    outline: 'none',
-    WebkitAppearance: 'none',
-    appearance: 'none',
-  }
-
-  // ─── Page wrapper ─────────────────────────────────────────────────────────
-  //
-  //  Layout: top-down, max-width 480px, centred. No vertical-centering trick
-  //  (that's what broke mobile — centering a tall card with the keyboard open).
-  //  Background is always the dark navy; on mobile it just fills the space above
-  //  the white content section.
-
+  /* ── render ──────────────────────────────────────────────────────────── */
   return (
     <div style={{
-      minHeight: '100vh',
-      background: '#080D1C',
-      backgroundImage:
-        'radial-gradient(ellipse 90% 40% at 50% 0%, rgba(200,168,75,0.15) 0%, transparent 65%)',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      WebkitFontSmoothing: 'antialiased',
+      minHeight:'100vh',
+      background:NAVY,
+      backgroundImage:'radial-gradient(ellipse 80% 35% at 50% 0%,rgba(196,165,53,.17) 0%,transparent 65%)',
+      fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif",
+      WebkitFontSmoothing:'antialiased',
+      display:'flex', flexDirection:'column', alignItems:'center',
+      padding:'32px 16px 64px',
     }}>
       <style>{`
-        .atc-inp:focus { border-color: ${GOLD} !important; background: #fff !important; box-shadow: 0 0 0 3px rgba(200,168,75,0.13) !important; }
-        .atc-row:active { background: #F5F5F7 !important; }
-        .atc-gbtn:active { opacity: 0.82; }
+        .i:focus{border-color:${GOLD}!important;background:#fff!important;box-shadow:0 0 0 3px rgba(196,165,53,.14)!important}
+        .dr:active{background:#F4F4F7!important}
+        button:active{opacity:.8}
       `}</style>
 
-      {/* ── Inner column ─────────────────────────────────────── */}
-      <div style={{ maxWidth: 480, margin: '0 auto', padding: '0 0 60px' }}>
-
-        {/* ── Top bar ──────────────────────────────────────────── */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '20px 20px 16px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 38, height: 38, borderRadius: 11,
-              background: `linear-gradient(145deg, #D4AA50, #8B6A00)`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: 800, fontSize: 17, color: '#fff',
-              boxShadow: '0 4px 14px rgba(200,168,75,0.45)',
-              flexShrink: 0,
-            }}>A</div>
-            <div>
-              <div style={{ color: '#fff', fontWeight: 700, fontSize: 15, letterSpacing: -0.3 }}>
-                Apex Tap Cards
-              </div>
-              <div style={{ color: 'rgba(255,255,255,0.38)', fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase' }}>
-                Admin Portal
-              </div>
-            </div>
+      {/* ── brand ─────────────────────────────────────────────────── */}
+      <div style={{
+        display:'flex',alignItems:'center',justifyContent:'space-between',
+        width:'100%',maxWidth:400,marginBottom:20,
+      }}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{
+            width:36,height:36,borderRadius:10,flexShrink:0,
+            background:'linear-gradient(145deg,#D4AA40,#8A6800)',
+            display:'flex',alignItems:'center',justifyContent:'center',
+            fontWeight:800,fontSize:16,color:'#fff',
+            boxShadow:'0 4px 12px rgba(196,165,53,.45)',
+          }}>A</div>
+          <div>
+            <div style={{color:'#fff',fontWeight:700,fontSize:14,letterSpacing:-.2}}>Apex Tap Cards</div>
+            <div style={{color:'rgba(255,255,255,.35)',fontSize:11,letterSpacing:.5,textTransform:'uppercase'}}>Admin</div>
           </div>
+        </div>
+        {authed && (
+          <div style={{
+            display:'flex',alignItems:'center',gap:6,
+            background:'rgba(196,165,53,.1)',border:'1px solid rgba(196,165,53,.2)',
+            borderRadius:20,padding:'4px 10px',
+            color:GOLD,fontSize:11,fontWeight:700,letterSpacing:.7,
+          }}>
+            <div style={{width:5,height:5,borderRadius:'50%',background:GOLD,boxShadow:`0 0 6px ${GOLD}`}}/>
+            LIVE
+          </div>
+        )}
+      </div>
 
-          {authed && (
+      {/* ── card ──────────────────────────────────────────────────── */}
+      <div style={{
+        width:'100%',maxWidth:400,
+        background:'#fff',borderRadius:20,
+        padding:'28px 22px',
+        boxShadow:'0 20px 60px rgba(0,0,0,.55)',
+      }}>
+
+        {/* LOGIN */}
+        {!authed && (
+          <form onSubmit={login}>
+            <div style={{fontSize:22,fontWeight:800,color:NAVY,letterSpacing:-.5,marginBottom:4}}>Sign in</div>
+            <div style={{fontSize:14,color:'#999',marginBottom:22}}>Access the Apex admin portal</div>
+            <Label>Password</Label>
+            <Input type="password" placeholder="••••••••" value={pw} onChange={e=>setPw(e.target.value)} autoFocus style={{marginBottom:12}}/>
+            {pwErr && (
+              <div style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:10,
+                padding:'10px 14px',color:'#DC2626',fontSize:13,fontWeight:500,marginBottom:12}}>
+                {pwErr}
+              </div>
+            )}
+            <Btn gold type="submit">Sign In</Btn>
+          </form>
+        )}
+
+        {/* SUCCESS */}
+        {authed && addSt==='success' && result && (
+          <div style={{textAlign:'center'}}>
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: 'rgba(200,168,75,0.1)', border: '1px solid rgba(200,168,75,0.22)',
-              borderRadius: 20, padding: '5px 11px',
-              color: GOLD, fontSize: 11, fontWeight: 700, letterSpacing: 0.8,
-            }}>
-              <div style={{
-                width: 6, height: 6, borderRadius: '50%',
-                background: GOLD, boxShadow: `0 0 7px ${GOLD}`,
-              }} />
-              LIVE
+              width:68,height:68,borderRadius:'50%',
+              background:'linear-gradient(135deg,#D4AA40,#8A6800)',
+              display:'flex',alignItems:'center',justifyContent:'center',
+              fontSize:30,color:'#fff',margin:'0 auto 18px',
+              boxShadow:'0 8px 24px rgba(196,165,53,.45)',
+            }}>✓</div>
+            <div style={{fontSize:20,fontWeight:800,color:NAVY,letterSpacing:-.4,marginBottom:6}}>{name} is live!</div>
+            <div style={{fontSize:14,color:'#999',marginBottom:20}}>Program each NFC card with this URL</div>
+            <div style={{
+              background:NAVY,borderRadius:12,padding:'14px',
+              fontFamily:'monospace',fontSize:13,color:GOLD,fontWeight:700,
+              wordBreak:'break-all',lineHeight:1.5,marginBottom:16,
+              border:'1px solid rgba(196,165,53,.15)',
+            }}>{result.cardUrl}</div>
+            <Btn gold onClick={copy} style={{marginBottom:10,
+              background:copied?'linear-gradient(135deg,#22C55E,#16A34A)':undefined,
+              boxShadow:copied?'0 4px 16px rgba(34,197,94,.4)':undefined}}>
+              {copied?'✓ Copied!':'Copy URL'}
+            </Btn>
+            <Btn onClick={reset}>Add Another</Btn>
+          </div>
+        )}
+
+        {/* MAIN FORM */}
+        {authed && addSt!=='success' && (
+          <form onSubmit={addClient}>
+
+            {/* search */}
+            <Label>Search Business</Label>
+            <div style={{position:'relative',marginBottom:16}}>
+              <span style={{
+                position:'absolute',left:13,top:'50%',transform:'translateY(-50%)',
+                fontSize:17,color:picked?GOLD:'#C0C0CC',pointerEvents:'none',
+                transition:'color .15s',lineHeight:1,
+              }}>⌕</span>
+              <Input
+                className="i"
+                type="text"
+                placeholder="Business name..."
+                value={query}
+                onChange={onQ}
+                onFocus={()=>{if(sugs.length>0)setDrop(true)}}
+                onBlur={()=>{if(!inDrop.current)setDrop(false)}}
+                autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                style={{paddingLeft:40}}
+              />
+              {drop && sugs.length>0 && (
+                <div
+                  onMouseDown={()=>{inDrop.current=true}}
+                  onMouseUp={()=>{inDrop.current=false}}
+                  onTouchStart={()=>{inDrop.current=true}}
+                  onTouchEnd={()=>{inDrop.current=false}}
+                  style={{
+                    position:'absolute',top:'calc(100% + 6px)',left:0,right:0,
+                    background:'#fff',borderRadius:14,zIndex:999,
+                    boxShadow:'0 8px 30px rgba(0,0,0,.13),0 0 0 1px rgba(0,0,0,.05)',
+                    overflow:'hidden',
+                  }}
+                >
+                  {sugs.map((s,i)=>{
+                    const p=s.placePrediction
+                    const main=p?.structuredFormat?.mainText?.text||p?.text?.text||''
+                    const sec=p?.structuredFormat?.secondaryText?.text||''
+                    return (
+                      <div key={i} className="dr"
+                        onMouseDown={e=>{e.preventDefault();pick(s)}}
+                        onTouchEnd={e=>{e.preventDefault();pick(s)}}
+                        style={{
+                          padding:'12px 14px',cursor:'pointer',
+                          borderBottom:i<sugs.length-1?'1px solid #F0F0F4':'none',
+                          minHeight:52,display:'flex',flexDirection:'column',justifyContent:'center',
+                        }}>
+                        <div style={{fontSize:15,fontWeight:600,color:'#111',lineHeight:1.3}}>{main}</div>
+                        {sec&&<div style={{fontSize:12,color:'#AAA',marginTop:2,lineHeight:1.3}}>{sec}</div>}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* ── White content area ────────────────────────────────── */}
-        <div style={{
-          background: '#fff',
-          borderRadius: '22px 22px 0 0',
-          minHeight: 'calc(100vh - 90px)',
-          padding: '28px 20px 32px',
-        }}>
-
-          {/* ═══ LOGIN ════════════════════════════════════════════ */}
-          {!authed && (
-            <form onSubmit={handleLogin}>
-              <div style={{ fontSize: 24, fontWeight: 800, color: '#0B1120', letterSpacing: -0.6, marginBottom: 4 }}>
-                Sign in
+            {/* status */}
+            {pStatus==='checking' && (
+              <StatusPill color="#999" bg="#F7F7FA" border="#EEEEF4" dot="#D0D0DC">
+                Checking...
+              </StatusPill>
+            )}
+            {pStatus==='new' && (
+              <StatusPill color="#15803D" bg="#F0FDF4" border="#BBF7D0" dot="#22C55E">
+                New lead — never visited
+              </StatusPill>
+            )}
+            {pStatus==='pitched' && (
+              <div style={{background:'#FFFBEB',border:'1px solid #FDE68A',borderRadius:12,padding:'12px 14px',marginBottom:16}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:'#92400E',fontWeight:700,marginBottom:history.length?10:0}}>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:'#F59E0B',flexShrink:0}}/>
+                  Already visited
+                </div>
+                {history.map((h,i)=>(
+                  <div key={i} style={{borderTop:'1px solid rgba(253,230,138,.7)',paddingTop:7,marginTop:7,fontSize:13,color:'#78350F',lineHeight:1.6}}>
+                    <b>{h.visited_by}</b> · {OUTCOMES[h.outcome]||h.outcome} · <span style={{color:'#A16207'}}>{fmtDate(h.visited_at)}</span>
+                  </div>
+                ))}
               </div>
-              <div style={{ fontSize: 15, color: '#9A9AAA', marginBottom: 28 }}>
-                Enter your password to continue
+            )}
+
+            {/* log visit */}
+            {picked && (pStatus==='new'||pStatus==='pitched') && logSt!=='logged' && (
+              <div style={{background:'#F7F7FA',borderRadius:14,padding:'16px 14px',marginBottom:16,border:'1px solid #EEEEF4'}}>
+                <Label>Log This Visit</Label>
+                <Input type="text" placeholder="Your name" value={rep} onChange={e=>setRep(e.target.value)}
+                  style={{marginBottom:8,background:'#fff'}}/>
+                <div style={{position:'relative',marginBottom:10}}>
+                  <select className="i" value={outcome} onChange={e=>setOutcome(e.target.value)}
+                    style={{...inp,background:'#fff',paddingRight:34,cursor:'pointer',color:outcome?'#111':'#AAA'}}>
+                    <option value="">Select outcome...</option>
+                    <option value="pitched">Pitched — Awaiting Decision</option>
+                    <option value="not_interested">Not Interested</option>
+                    <option value="follow_up">Follow-Up Scheduled</option>
+                    <option value="sold">Sold ✓</option>
+                  </select>
+                  <span style={{position:'absolute',right:13,top:'50%',transform:'translateY(-50%)',pointerEvents:'none',color:'#AAA',fontSize:11}}>▼</span>
+                </div>
+                <Btn onClick={logVisit}
+                  disabled={!rep.trim()||!outcome||logSt==='loading'}
+                  style={{background:'#fff',border:'1.5px solid #DDDDE8',color:'#444',boxShadow:'none'}}>
+                  {logSt==='loading'?'Logging...':'Log Visit'}
+                </Btn>
+                {logSt==='error'&&<div style={{color:'#DC2626',fontSize:13,marginTop:8}}>Failed — try again.</div>}
               </div>
-
-              <Field label="Password">
-                <input
-                  className="atc-inp"
-                  style={inp}
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  autoFocus
-                />
-              </Field>
-
-              {pwError && (
-                <div style={{
-                  background: '#FEF2F2', border: '1px solid #FECACA',
-                  borderRadius: 10, padding: '11px 14px',
-                  color: '#DC2626', fontSize: 14, fontWeight: 500, marginBottom: 14,
-                }}>{pwError}</div>
-              )}
-
-              <GoldButton type="submit">Sign In</GoldButton>
-            </form>
-          )}
-
-          {/* ═══ SUCCESS ══════════════════════════════════════════ */}
-          {authed && addStatus === 'success' && result && (
-            <div style={{ textAlign: 'center', paddingTop: 12 }}>
-              <div style={{
-                width: 76, height: 76, borderRadius: '50%',
-                background: `linear-gradient(135deg, #D4AA50, #8B6A00)`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 34, color: '#fff', margin: '0 auto 20px',
-                boxShadow: '0 8px 28px rgba(200,168,75,0.45)',
-              }}>✓</div>
-
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#0B1120', letterSpacing: -0.5, marginBottom: 6 }}>
-                {clientName} is live!
+            )}
+            {logSt==='logged' && (
+              <div style={{display:'flex',alignItems:'center',gap:8,background:'#F0FDF4',
+                border:'1px solid #BBF7D0',borderRadius:12,padding:'11px 14px',marginBottom:16,
+                fontSize:14,color:'#15803D',fontWeight:600}}>
+                <span style={{width:18,height:18,borderRadius:'50%',background:'#22C55E',
+                  color:'#fff',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✓</span>
+                Visit logged
               </div>
-              <div style={{ fontSize: 15, color: '#9A9AAA', marginBottom: 24 }}>
-                Program each NFC card with this URL
+            )}
+
+            {/* add client */}
+            {picked && pStatus!=='checking' && (
+              <div style={{background:'#F7F7FA',borderRadius:14,padding:'16px 14px',border:'1px solid #EEEEF4'}}>
+                <Label>Add as Client</Label>
+                <div style={{fontSize:14,color:'#15803D',fontWeight:600,marginBottom:14,display:'flex',alignItems:'center',gap:7}}>
+                  <span style={{width:16,height:16,borderRadius:'50%',background:'#22C55E',color:'#fff',
+                    fontSize:9,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✓</span>
+                  {name}
+                </div>
+                <Label>URL Slug</Label>
+                <Input type="text" value={slug}
+                  onChange={e=>setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,''))}
+                  style={{fontFamily:'monospace',letterSpacing:.3,background:'#fff',marginBottom:10}}/>
+                <div style={{background:NAVY,borderRadius:10,padding:'10px 12px',marginBottom:14,
+                  fontFamily:'monospace',fontSize:13,wordBreak:'break-all',lineHeight:1.5,
+                  border:'1px solid rgba(196,165,53,.12)'}}>
+                  <span style={{color:'rgba(255,255,255,.3)'}}>{DOMAIN}/</span>
+                  <span style={{color:GOLD,fontWeight:700}}>{slug||'...'}</span>
+                </div>
+                {addSt==='error' && (
+                  <div style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:10,
+                    padding:'10px 13px',color:'#DC2626',fontSize:13,fontWeight:500,marginBottom:12}}>
+                    {addErr}
+                  </div>
+                )}
+                <Btn gold type="submit" disabled={!canAdd}>
+                  {addSt==='loading'?'Adding...':'Add Client'}
+                </Btn>
               </div>
+            )}
 
-              <div style={{
-                background: '#080D1C', borderRadius: 14,
-                padding: '16px 14px', marginBottom: 18,
-                fontFamily: 'monospace', fontSize: 14,
-                color: GOLD, fontWeight: 700,
-                wordBreak: 'break-all', lineHeight: 1.5,
-                border: '1px solid rgba(200,168,75,0.15)',
-              }}>
-                {result.cardUrl}
-              </div>
+          </form>
+        )}
 
-              <GoldButton
-                onClick={copyUrl}
-                style={{
-                  marginBottom: 10,
-                  background: copied
-                    ? 'linear-gradient(135deg, #22C55E, #16A34A)'
-                    : `linear-gradient(135deg, #D4AA50, #8B6A00)`,
-                  boxShadow: copied
-                    ? '0 4px 18px rgba(34,197,94,0.4)'
-                    : '0 4px 18px rgba(200,168,75,0.4)',
-                }}
-              >
-                {copied ? '✓ Copied!' : 'Copy URL'}
-              </GoldButton>
-              <OutlineButton onClick={reset}>Add Another Client</OutlineButton>
-            </div>
-          )}
-
-          {/* ═══ MAIN FORM ════════════════════════════════════════ */}
-          {authed && addStatus !== 'success' && (
-            <form onSubmit={handleAddClient}>
-
-              {/* Search */}
-              <Field label="Search Business">
-                <div style={{ position: 'relative' }}>
-                  <div style={{
-                    position: 'absolute', left: 14, top: '50%',
-                    transform: 'translateY(-50%)',
-                    fontSize: 17, color: selected ? GOLD : '#C0C0CC',
-                    pointerEvents: 'none', transition: 'color 0.15s',
-                    lineHeight: 1,
-                  }}>⌕</div>
-                  <input
-                    className="atc-inp"
-                    style={{ ...inp, paddingLeft: 42 }}
-                    type="text"
-                    placeholder="Type a business name..."
-                    value={query}
-                    onChange={onQueryChange}
-                    onFocus={() => { if (suggestions.length > 0) setShowDrop(true) }}
-                    onBlur={() => { if (!inDrop.current) setShowDrop(false) }}
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck="false"
-                  />
-
-                  {/* Dropdown */}
-                  {showDrop && suggestions.length > 0 && (
-                    <div
-                      onMouseDown={() => { inDrop.current = true }}
-                      onMouseUp={() => { inDrop.current = false }}
-                      onTouchStart={() => { inDrop.current = true }}
-                      onTouchEnd={() => { inDrop.current = false }}
-                      style={{
-                        position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
-                        background: '#fff', borderRadius: 14, zIndex: 9999,
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.06)',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {suggestions.map((sug, i) => {
-                        const pred = sug.placePrediction
-                        const main = pred?.structuredFormat?.mainText?.text || pred?.text?.text || ''
-                        const sec  = pred?.structuredFormat?.secondaryText?.text || ''
-                        return (
-                          <div
-                            key={i}
-                            className="atc-row"
-                            onMouseDown={e => { e.preventDefault(); pickSuggestion(sug) }}
-                            onTouchEnd={e => { e.preventDefault(); pickSuggestion(sug) }}
-                            style={{
-                              padding: '13px 16px',
-                              borderBottom: i < suggestions.length - 1 ? '1px solid #F3F3F6' : 'none',
-                              cursor: 'pointer',
-                              minHeight: 56,
-                              display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                            }}
-                          >
-                            <div style={{ fontSize: 15, fontWeight: 600, color: '#111', lineHeight: 1.3 }}>{main}</div>
-                            {sec && <div style={{ fontSize: 13, color: '#A0A0B0', marginTop: 2, lineHeight: 1.3 }}>{sec}</div>}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              </Field>
-
-              {/* Status banner */}
-              {pitchStatus === 'checking' && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  background: '#F5F5F8', borderRadius: 12,
-                  padding: '13px 16px', marginBottom: 20,
-                  fontSize: 14, color: '#9A9AAA',
-                }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#D0D0DC', flexShrink: 0 }} />
-                  Checking visit history...
-                </div>
-              )}
-
-              {pitchStatus === 'new' && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  background: '#F0FDF4', border: '1px solid #BBF7D0',
-                  borderRadius: 12, padding: '13px 16px', marginBottom: 20,
-                  fontSize: 14, color: '#15803D', fontWeight: 600,
-                }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
-                  New lead — never been visited
-                </div>
-              )}
-
-              {pitchStatus === 'pitched' && (
-                <div style={{
-                  background: '#FFFBEB', border: '1px solid #FDE68A',
-                  borderRadius: 12, padding: '13px 16px', marginBottom: 20,
-                }}>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    fontSize: 14, color: '#92400E', fontWeight: 700,
-                    marginBottom: pitchHistory.length ? 10 : 0,
-                  }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
-                    Already visited
-                  </div>
-                  {pitchHistory.map((h, i) => (
-                    <div key={i} style={{
-                      borderTop: '1px solid rgba(253,230,138,0.8)',
-                      paddingTop: 8, marginTop: 8,
-                      fontSize: 13, color: '#78350F', lineHeight: 1.6,
-                    }}>
-                      <span style={{ fontWeight: 700 }}>{h.visited_by}</span>
-                      {' · '}
-                      <span>{OUTCOMES[h.outcome] || h.outcome}</span>
-                      {' · '}
-                      <span style={{ color: '#A16207' }}>{fmt(h.visited_at)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Log visit */}
-              {selected && (pitchStatus === 'new' || pitchStatus === 'pitched') && logStatus !== 'logged' && (
-                <div style={{
-                  background: '#F8F8FB', borderRadius: 16,
-                  padding: '18px 16px', marginBottom: 20,
-                  border: '1px solid #EBEBF0',
-                }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#8A8A9A', textTransform: 'uppercase', letterSpacing: '0.9px', marginBottom: 12 }}>
-                    Log This Visit
-                  </div>
-                  <input
-                    className="atc-inp"
-                    style={{ ...inp, background: '#fff', marginBottom: 8 }}
-                    type="text"
-                    placeholder="Your name"
-                    value={repName}
-                    onChange={e => setRepName(e.target.value)}
-                  />
-                  <div style={{ position: 'relative', marginBottom: 12 }}>
-                    <select
-                      className="atc-inp"
-                      style={{
-                        ...inp, background: '#fff',
-                        paddingRight: 36,
-                        color: outcome ? '#111' : '#9A9AAA',
-                        cursor: 'pointer',
-                      }}
-                      value={outcome}
-                      onChange={e => setOutcome(e.target.value)}
-                    >
-                      <option value="">Select outcome...</option>
-                      <option value="pitched">Pitched — Awaiting Decision</option>
-                      <option value="not_interested">Not Interested</option>
-                      <option value="follow_up">Follow-Up Scheduled</option>
-                      <option value="sold">Sold ✓</option>
-                    </select>
-                    <div style={{
-                      position: 'absolute', right: 14, top: '50%',
-                      transform: 'translateY(-50%)',
-                      pointerEvents: 'none', color: '#9A9AAA', fontSize: 11,
-                    }}>▼</div>
-                  </div>
-                  <OutlineButton
-                    onClick={handleLogVisit}
-                    style={{
-                      opacity: !repName.trim() || !outcome || logStatus === 'loading' ? 0.4 : 1,
-                      cursor: !repName.trim() || !outcome ? 'not-allowed' : 'pointer',
-                      background: '#fff',
-                    }}
-                  >
-                    {logStatus === 'loading' ? 'Logging...' : 'Log Visit'}
-                  </OutlineButton>
-                  {logStatus === 'error' && (
-                    <div style={{ color: '#DC2626', fontSize: 13, marginTop: 8 }}>Failed — try again.</div>
-                  )}
-                </div>
-              )}
-
-              {logStatus === 'logged' && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  background: '#F0FDF4', border: '1px solid #BBF7D0',
-                  borderRadius: 12, padding: '12px 14px', marginBottom: 20,
-                  fontSize: 14, color: '#15803D', fontWeight: 600,
-                }}>
-                  <span style={{
-                    width: 20, height: 20, borderRadius: '50%',
-                    background: '#22C55E', color: '#fff', fontSize: 11,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}>✓</span>
-                  Visit logged
-                </div>
-              )}
-
-              {/* Add client section */}
-              {selected && pitchStatus !== 'checking' && (
-                <div style={{
-                  background: '#F8F8FB', borderRadius: 16,
-                  padding: '18px 16px',
-                  border: '1px solid #EBEBF0',
-                }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#8A8A9A', textTransform: 'uppercase', letterSpacing: '0.9px', marginBottom: 12 }}>
-                    Add as Client
-                  </div>
-
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    fontSize: 14, color: '#15803D', fontWeight: 600,
-                    marginBottom: 16,
-                  }}>
-                    <span style={{
-                      width: 18, height: 18, borderRadius: '50%',
-                      background: '#22C55E', color: '#fff', fontSize: 10,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>✓</span>
-                    {clientName}
-                  </div>
-
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#8A8A9A', textTransform: 'uppercase', letterSpacing: '0.9px', marginBottom: 7 }}>
-                    URL Slug
-                  </div>
-                  <input
-                    className="atc-inp"
-                    style={{ ...inp, background: '#fff', fontFamily: 'monospace', letterSpacing: 0.3, marginBottom: 10 }}
-                    type="text"
-                    value={slug}
-                    onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                  />
-
-                  {/* URL preview */}
-                  <div style={{
-                    background: '#080D1C', borderRadius: 10,
-                    padding: '11px 13px', marginBottom: 16,
-                    fontFamily: 'monospace', fontSize: 13, lineHeight: 1.5,
-                    border: '1px solid rgba(200,168,75,0.12)',
-                    wordBreak: 'break-all',
-                  }}>
-                    <span style={{ color: 'rgba(255,255,255,0.3)' }}>{DOMAIN}/</span>
-                    <span style={{ color: GOLD, fontWeight: 700 }}>{slug || '...'}</span>
-                  </div>
-
-                  {addStatus === 'error' && (
-                    <div style={{
-                      background: '#FEF2F2', border: '1px solid #FECACA',
-                      borderRadius: 10, padding: '11px 14px', marginBottom: 14,
-                      color: '#DC2626', fontSize: 14, fontWeight: 500,
-                    }}>{addError}</div>
-                  )}
-
-                  <GoldButton type="submit" disabled={!canAdd}>
-                    {addStatus === 'loading' ? 'Adding...' : 'Add Client'}
-                  </GoldButton>
-                </div>
-              )}
-
-            </form>
-          )}
-
-        </div>
       </div>
     </div>
   )
