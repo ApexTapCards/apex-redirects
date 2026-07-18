@@ -91,15 +91,16 @@ export default function AdminPage() {
     debounceRef.current = setTimeout(() => fetchSuggestions(val), 300)
   }
 
-  async function checkPitch(placeId, businessName, slug) {
+  async function checkPitch(placeId, businessName) {
     setPitchStatus('checking')
     try {
       const res = await fetch(
-        `/api/check-pitch?placeId=${encodeURIComponent(placeId)}&businessName=${encodeURIComponent(businessName)}&slug=${encodeURIComponent(slug)}`
+        `/api/check-pitch?placeId=${encodeURIComponent(placeId)}&businessName=${encodeURIComponent(businessName)}`
       )
       const data = await res.json()
       setPitchStatus(data.status)
       if (data.pitches) setPitchHistory(data.pitches)
+      if (data.clients) setPitchHistory(data.clients)
     } catch (err) {
       console.error('Pitch check error:', err)
       setPitchStatus('new')
@@ -124,7 +125,7 @@ export default function AdminPage() {
     setPitchHistory([])
     setLogStatus(null)
     setVisitOutcome('')
-    checkPitch(placeId, name, fullSlug)
+    checkPitch(placeId, name)
   }
 
   async function handleLogVisit() {
@@ -261,7 +262,7 @@ export default function AdminPage() {
     )
   }
 
-  const isReady = clientName.trim() && googleUrl.trim() && slug.trim() && pitchStatus !== 'client' && pitchStatus !== 'checking'
+  const isReady = clientName.trim() && googleUrl.trim() && slug.trim() && pitchStatus !== 'checking'
 
   return (
     <div style={s.page}><div style={s.card}>
@@ -310,11 +311,8 @@ export default function AdminPage() {
           <div style={s.statusNew}>🟢 New lead — never been visited</div>
         )}
         {pitchStatus === 'client' && (
-          <div style={s.statusClient}>🔴 Already a client — this business is in the system</div>
-        )}
-        {pitchStatus === 'existing_location' && (
           <div style={{ ...s.statusPitched, background: '#FFF7ED', borderColor: '#FED7AA', color: '#9A3412', marginBottom: '16px' }}>
-            ⚠️ Another location of this business is already a client — confirm the URL slug below is unique before adding
+            ⚠️ This business name is already a client — if this is a different location, update the URL slug below before adding
           </div>
         )}
         {pitchStatus === 'pitched' && (
@@ -372,36 +370,22 @@ export default function AdminPage() {
         )}
 
         {/* Add client section */}
-        {placeSelected && pitchStatus !== 'client' && pitchStatus !== 'checking' && (
+        {placeSelected && pitchStatus !== 'checking' && (
           <>
             <hr style={s.sectionDivider} />
             <div style={s.confirmed}>✓ {clientName} — review link ready</div>
 
-            {slug && (
-              <>
-                <div style={s.hint}>Card URL preview:</div>
-                <div style={s.preview}>{DOMAIN}/{slug}</div>
-                {!useCustomSlug && (
-                  <span style={s.toggleLink} onClick={() => { setUseCustomSlug(true); setCustomSlug(slug) }}>
-                    Edit URL slug
-                  </span>
-                )}
-              </>
-            )}
-
-            {useCustomSlug && (
-              <>
-                <label style={s.label}>URL Slug</label>
-                <input
-                  style={{ ...s.input, marginBottom: '8px' }}
-                  type="text"
-                  placeholder="marios-pizza"
-                  value={customSlug}
-                  onChange={e => setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                />
-                <div style={s.preview}>{DOMAIN}/{customSlug || '...'}</div>
-              </>
-            )}
+            <label style={s.label}>URL Slug</label>
+            <input
+              style={{ ...s.input, marginBottom: '8px' }}
+              type="text"
+              placeholder="marios-pizza"
+              value={slug}
+              onChange={e => { setUseCustomSlug(true); setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')) }}
+            />
+            <div style={{ ...s.hint, marginBottom: '16px' }}>
+              Card URL: <span style={{ fontFamily: 'monospace', color: '#8C6937' }}>{DOMAIN}/{slug || '...'}</span>
+            </div>
 
             {status === 'error' && <div style={s.error}>{errorMsg}</div>}
 
