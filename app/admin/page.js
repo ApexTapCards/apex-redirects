@@ -261,7 +261,7 @@ export default function AdminPage() {
     )
   }
 
-  const isReady = clientName.trim() && googleUrl.trim() && slug.trim() && pitchStatus !== 'client'
+  const isReady = clientName.trim() && googleUrl.trim() && slug.trim() && pitchStatus !== 'client' && pitchStatus !== 'checking'
 
   return (
     <div style={s.page}><div style={s.card}>
@@ -311,6 +311,11 @@ export default function AdminPage() {
         )}
         {pitchStatus === 'client' && (
           <div style={s.statusClient}>🔴 Already a client — this business is in the system</div>
+        )}
+        {pitchStatus === 'existing_location' && (
+          <div style={{ ...s.statusPitched, background: '#FFF7ED', borderColor: '#FED7AA', color: '#9A3412', marginBottom: '16px' }}>
+            ⚠️ Another location of this business is already a client — confirm the URL slug below is unique before adding
+          </div>
         )}
         {pitchStatus === 'pitched' && (
           <div style={{ marginBottom: '16px' }}>
@@ -367,7 +372,7 @@ export default function AdminPage() {
         )}
 
         {/* Add client section */}
-        {placeSelected && pitchStatus !== 'client' && (
+        {placeSelected && pitchStatus !== 'client' && pitchStatus !== 'checking' && (
           <>
             <hr style={s.sectionDivider} />
             <div style={s.confirmed}>✓ {clientName} — review link ready</div>
