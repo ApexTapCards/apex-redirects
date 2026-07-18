@@ -15,6 +15,14 @@ function toSlug(name) {
   return name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-')
 }
 
+function extractCity(secondaryText) {
+  if (!secondaryText) return ''
+  const parts = secondaryText.split(', ')
+  // Format: [Street], City, Province, Country — city is 3rd from end
+  if (parts.length >= 3) return parts[parts.length - 3]
+  return parts[0] || ''
+}
+
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })
 }
@@ -32,6 +40,7 @@ export default function AdminPage() {
   const [showDropdown, setShowDropdown] = useState(false)
   const [placeSelected, setPlaceSelected] = useState(false)
 
+  const [location, setLocation] = useState('')
   const [customSlug, setCustomSlug] = useState('')
   const [useCustomSlug, setUseCustomSlug] = useState(false)
 
@@ -47,7 +56,8 @@ export default function AdminPage() {
 
   const debounceRef = useRef(null)
 
-  const slug = useCustomSlug ? customSlug : toSlug(clientName)
+  const baseSlug = location.trim() ? toSlug(clientName) + '-' + toSlug(location) : toSlug(clientName)
+  const slug = useCustomSlug ? customSlug : baseSlug
   const cardUrl = `https://${DOMAIN}/${slug}`
 
   async function fetchSuggestions(input) {
@@ -100,7 +110,9 @@ export default function AdminPage() {
     const pred = suggestion.placePrediction
     const name = pred?.structuredFormat?.mainText?.text || pred?.text?.text || ''
     const placeId = pred?.placeId || ''
+    const city = extractCity(pred?.structuredFormat?.secondaryText?.text || '')
     setClientName(name)
+    setLocation(city)
     setGoogleUrl(`https://search.google.com/local/writereview?placeid=${placeId}`)
     setQuery(name)
     setPlaceSelected(true)
@@ -170,7 +182,7 @@ export default function AdminPage() {
     const data = await res.json()
     if (res.ok) {
       setStatus('success'); setResult({ slug, cardUrl })
-      setClientName(''); setGoogleUrl(''); setCustomSlug(''); setUseCustomSlug(false)
+      setClientName(''); setGoogleUrl(''); setCustomSlug(''); setUseCustomSlug(false); setLocation('')
       setPlaceSelected(false); setQuery(''); setSuggestions([])
       setPitchStatus(null); setPitchHistory([]); setLogStatus(null); setCurrentPlaceId('')
     } else {
@@ -180,7 +192,7 @@ export default function AdminPage() {
 
   function reset() {
     setStatus(null); setResult(null); setErrorMsg(''); setPlaceSelected(false)
-    setQuery(''); setClientName(''); setGoogleUrl('')
+    setQuery(''); setClientName(''); setGoogleUrl(''); setLocation('')
     setPitchStatus(null); setPitchHistory([]); setLogStatus(null); setCurrentPlaceId('')
   }
 
