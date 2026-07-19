@@ -51,16 +51,47 @@ function Logo({ height = 38 }) {
   )
 }
 
+const Card = ({ children, style: s = {} }) => (
+  <div style={{ background: '#FFFDF9', borderRadius: 16, border: '1px solid #E5DDD0', padding: '20px 18px', boxShadow: '0 2px 12px rgba(22,32,64,.07)', ...s }}>
+    {children}
+  </div>
+)
+
+const Label = ({ children }) => (
+  <div style={{ fontSize: 11, fontWeight: 700, color: '#9E9488', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 8 }}>{children}</div>
+)
+
+const GoldBtn = ({ children, disabled, type = 'button', onClick, style: s = {} }) => (
+  <button type={type} onClick={onClick} disabled={disabled} style={{
+    width: '100%', height: 52, borderRadius: 13, border: 'none',
+    background: disabled ? '#EAE4DC' : GOLD_G,
+    color: disabled ? '#B5A898' : '#fff',
+    fontSize: 16, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer',
+    fontFamily: 'inherit', boxShadow: disabled ? 'none' : '0 4px 18px rgba(184,150,46,.32)',
+    ...s,
+  }}>{children}</button>
+)
+
+const OutlineBtn = ({ children, onClick, disabled }) => (
+  <button className="gbtn" type="button" onClick={onClick} disabled={disabled} style={{
+    width: '100%', height: 50, borderRadius: 13,
+    background: '#F2EDE4', border: '1.5px solid #E5DDD0',
+    color: disabled ? '#B5A898' : NAVY,
+    fontSize: 15, fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer',
+    fontFamily: 'inherit', opacity: disabled ? .45 : 1,
+  }}>{children}</button>
+)
+
 export default function AdminPage() {
   const [authed, setAuthed]   = useState(false)
   const [pw, setPw]           = useState('')
   const [showPw, setShowPw]   = useState(false)
   const [pwErr, setPwErr]     = useState('')
 
-  const [query, setQuery]     = useState('')
   const [sugs, setSugs]       = useState([])
   const [drop, setDrop]       = useState(false)
   const [picked, setPicked]   = useState(false)
+  const searchRef             = useRef(null)
 
   const [bName, setBName]     = useState('')
   const [gUrl, setGUrl]       = useState('')
@@ -97,7 +128,7 @@ export default function AdminPage() {
 
   function onQ(e) {
     const v = e.target.value
-    setQuery(v); setPicked(false)
+    setPicked(false)
     setBName(''); setGUrl(''); setPid(''); setSlug('')
     setPSt(null); setHist([]); setLogSt(null)
     setAddSt(null); setAddErr('')
@@ -113,7 +144,8 @@ export default function AdminPage() {
     const city = extractCity(full, n)
     const auto = city ? toSlug(n) + '-' + toSlug(city) : toSlug(n)
     setBName(n); setGUrl(`https://search.google.com/local/writereview?placeid=${id}`)
-    setPid(id); setSlug(auto); setQuery(n); setPicked(true)
+    setPid(id); setSlug(auto); setPicked(true)
+    if (searchRef.current) searchRef.current.value = n
     setSugs([]); setDrop(false)
     setHist([]); setLogSt(null); setOutcome(''); setAddSt(null); setAddErr('')
     checkPitch(id)
@@ -174,7 +206,8 @@ export default function AdminPage() {
 
   function reset() {
     setAddSt(null); setResult(null); setAddErr(''); setCopied(false)
-    setPicked(false); setQuery(''); setBName(''); setGUrl(''); setPid(''); setSlug('')
+    setPicked(false); setBName(''); setGUrl(''); setPid(''); setSlug('')
+    if (searchRef.current) searchRef.current.value = ''
     setPSt(null); setHist([]); setLogSt(null); setRep(''); setOutcome('')
   }
 
@@ -199,37 +232,6 @@ export default function AdminPage() {
     .gbtn:active { background: #EDE6DC !important; }
     select.inp option { background: #fff; color: ${NAVY}; }
   `
-
-  const Card = ({ children, style: s = {} }) => (
-    <div style={{ background: '#FFFDF9', borderRadius: 16, border: '1px solid #E5DDD0', padding: '20px 18px', boxShadow: '0 2px 12px rgba(22,32,64,.07)', ...s }}>
-      {children}
-    </div>
-  )
-
-  const Label = ({ children }) => (
-    <div style={{ fontSize: 11, fontWeight: 700, color: '#9E9488', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 8 }}>{children}</div>
-  )
-
-  const GoldBtn = ({ children, disabled, type = 'button', onClick, style: s = {} }) => (
-    <button type={type} onClick={onClick} disabled={disabled} style={{
-      width: '100%', height: 52, borderRadius: 13, border: 'none',
-      background: disabled ? '#EAE4DC' : GOLD_G,
-      color: disabled ? '#B5A898' : '#fff',
-      fontSize: 16, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer',
-      fontFamily: 'inherit', boxShadow: disabled ? 'none' : '0 4px 18px rgba(184,150,46,.32)',
-      ...s,
-    }}>{children}</button>
-  )
-
-  const OutlineBtn = ({ children, onClick, disabled }) => (
-    <button className="gbtn" type="button" onClick={onClick} disabled={disabled} style={{
-      width: '100%', height: 50, borderRadius: 13,
-      background: '#F2EDE4', border: '1.5px solid #E5DDD0',
-      color: disabled ? '#B5A898' : NAVY,
-      fontSize: 15, fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer',
-      fontFamily: 'inherit', opacity: disabled ? .45 : 1,
-    }}>{children}</button>
-  )
 
   const pageBg = {
     minHeight: '100vh',
@@ -299,7 +301,8 @@ export default function AdminPage() {
           <Label>Search Business</Label>
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-52%)', fontSize: 18, lineHeight: 1, pointerEvents: 'none', color: picked ? GOLD : '#C0C8DA', transition: 'color .15s' }}>⌕</span>
-            <input className="inp" style={{ ...inp, paddingLeft: 42 }} type="text" placeholder="Business name..." value={query} onChange={onQ}
+            <input className="inp" ref={searchRef} style={{ ...inp, paddingLeft: 42 }} type="text" placeholder="Business name..."
+              defaultValue="" onChange={onQ}
               onFocus={() => { if (sugs.length > 0) setDrop(true) }}
               onBlur={() => { if (!inDrop.current) setDrop(false) }}
               autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
