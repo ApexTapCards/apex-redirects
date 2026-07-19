@@ -233,7 +233,7 @@ export default function AdminPage() {
 
   const pageBg = {
     minHeight: '100vh',
-    background: 'linear-gradient(160deg, #EDF0FA 0%, #F5F7FF 60%, #EBF0FA 100%)',
+    background: 'linear-gradient(160deg, #F5F0E8 0%, #FAF7F2 50%, #F2EDE4 100%)',
     fontFamily: "'Inter',-apple-system,BlinkMacSystemFont,sans-serif",
     WebkitFontSmoothing: 'antialiased',
   }
