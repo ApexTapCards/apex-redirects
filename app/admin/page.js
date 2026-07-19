@@ -31,21 +31,22 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-// Inline SVG approximation of the Apex Tap Cards logo
+// Inline SVG logo matching Apex Tap Cards branding
 function Logo({ height = 38 }) {
-  const w = height * 4.2
+  const w = height * 3.8
   return (
-    <svg width={w} height={height} viewBox="0 0 420 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Mountain silhouette */}
-      <path d="M8 88 L62 12 L88 46 L114 12 L168 88 Z" fill={NAVY} />
-      <path d="M30 88 L62 36 L88 62 L114 36 L146 88 Z" fill="white" />
-      {/* NFC waves */}
-      <path d="M128 42 C 138 32 138 22 128 12" stroke={GOLD} strokeWidth="5.5" fill="none" strokeLinecap="round"/>
-      <path d="M138 48 C 153 32 153 18 138 2"  stroke={GOLD} strokeWidth="5.5" fill="none" strokeLinecap="round"/>
-      <path d="M148 54 C 168 32 168 14 148 -8" stroke={GOLD} strokeWidth="5.5" fill="none" strokeLinecap="round"/>
-      {/* Text */}
-      <text x="192" y="52" fontFamily="-apple-system,BlinkMacSystemFont,'Inter',sans-serif" fontWeight="800" fontSize="44" fill={NAVY} letterSpacing="-1">Apex</text>
-      <text x="192" y="92" fontFamily="-apple-system,BlinkMacSystemFont,'Inter',sans-serif" fontWeight="800" fontSize="38" fill={NAVY} letterSpacing="-0.5">Tap Cards</text>
+    <svg width={w} height={height} viewBox="0 0 380 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Single mountain peak */}
+      <path d="M6 90 L88 6 L170 90 Z" fill={NAVY} />
+      {/* Inner white chevron cutout */}
+      <path d="M34 90 L88 38 L142 90 Z" fill="white" />
+      {/* NFC waves off upper-right of peak */}
+      <path d="M130 42 C 143 29, 143 16, 130 3"   stroke={GOLD} strokeWidth="6" fill="none" strokeLinecap="round"/>
+      <path d="M141 50 C 159 32, 159 14, 141 -4"  stroke={GOLD} strokeWidth="6" fill="none" strokeLinecap="round"/>
+      <path d="M152 58 C 175 35, 175 12, 152 -11" stroke={GOLD} strokeWidth="6" fill="none" strokeLinecap="round"/>
+      {/* "Apex Tap Cards" text */}
+      <text x="195" y="48" fontFamily="-apple-system,BlinkMacSystemFont,'Inter',sans-serif" fontWeight="800" fontSize="42" fill={NAVY} letterSpacing="-1">Apex</text>
+      <text x="195" y="88" fontFamily="-apple-system,BlinkMacSystemFont,'Inter',sans-serif" fontWeight="700" fontSize="36" fill={NAVY} letterSpacing="-0.5">Tap Cards</text>
     </svg>
   )
 }
