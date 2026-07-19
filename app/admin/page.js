@@ -182,7 +182,7 @@ export default function AdminPage() {
 
   const inp = {
     display: 'block', width: '100%', height: 52, padding: '0 16px',
-    background: '#F2F5FB', border: '1.5px solid #DDE3F0',
+    background: '#EEE8DF', border: '1.5px solid #D9D0C4',
     borderRadius: 12, fontSize: 16, color: NAVY,
     fontFamily: 'inherit', outline: 'none',
     boxSizing: 'border-box', WebkitAppearance: 'none', appearance: 'none',
@@ -191,30 +191,30 @@ export default function AdminPage() {
   const css = `
     *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body { margin: 0; }
-    .inp::placeholder { color: #A0AABF; }
-    .inp:focus { border-color: ${GOLD} !important; background: #fff !important; box-shadow: 0 0 0 3px rgba(184,150,46,.14) !important; outline: none; }
-    input:-webkit-autofill { -webkit-box-shadow: 0 0 0 100px #F2F5FB inset !important; -webkit-text-fill-color: ${NAVY} !important; }
-    .dr:hover { background: #F5F7FC !important; }
-    .dr:active { background: #EEF1FA !important; }
-    .gbtn:active { background: #E8EDF8 !important; }
+    .inp::placeholder { color: #9E9488; }
+    .inp:focus { border-color: ${GOLD} !important; background: #fff !important; box-shadow: 0 0 0 3px rgba(184,150,46,.18) !important; outline: none; }
+    input:-webkit-autofill { -webkit-box-shadow: 0 0 0 100px #EEE8DF inset !important; -webkit-text-fill-color: ${NAVY} !important; }
+    .dr:hover { background: #FAF6F0 !important; }
+    .dr:active { background: #F2ECE4 !important; }
+    .gbtn:active { background: #EDE6DC !important; }
     select.inp option { background: #fff; color: ${NAVY}; }
   `
 
   const Card = ({ children, style: s = {} }) => (
-    <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #E4E9F4', padding: '20px 18px', boxShadow: '0 2px 12px rgba(22,32,64,.07)', ...s }}>
+    <div style={{ background: '#FFFDF9', borderRadius: 16, border: '1px solid #E5DDD0', padding: '20px 18px', boxShadow: '0 2px 12px rgba(22,32,64,.07)', ...s }}>
       {children}
     </div>
   )
 
   const Label = ({ children }) => (
-    <div style={{ fontSize: 11, fontWeight: 700, color: '#8892AA', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 8 }}>{children}</div>
+    <div style={{ fontSize: 11, fontWeight: 700, color: '#9E9488', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 8 }}>{children}</div>
   )
 
   const GoldBtn = ({ children, disabled, type = 'button', onClick, style: s = {} }) => (
     <button type={type} onClick={onClick} disabled={disabled} style={{
       width: '100%', height: 52, borderRadius: 13, border: 'none',
-      background: disabled ? '#E8EBF4' : GOLD_G,
-      color: disabled ? '#A0AABF' : '#fff',
+      background: disabled ? '#EAE4DC' : GOLD_G,
+      color: disabled ? '#B5A898' : '#fff',
       fontSize: 16, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer',
       fontFamily: 'inherit', boxShadow: disabled ? 'none' : '0 4px 18px rgba(184,150,46,.32)',
       ...s,
@@ -224,8 +224,8 @@ export default function AdminPage() {
   const OutlineBtn = ({ children, onClick, disabled }) => (
     <button className="gbtn" type="button" onClick={onClick} disabled={disabled} style={{
       width: '100%', height: 50, borderRadius: 13,
-      background: '#F2F5FB', border: '1.5px solid #DDE3F0',
-      color: disabled ? '#A0AABF' : NAVY,
+      background: '#F2EDE4', border: '1.5px solid #E5DDD0',
+      color: disabled ? '#B5A898' : NAVY,
       fontSize: 15, fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer',
       fontFamily: 'inherit', opacity: disabled ? .45 : 1,
     }}>{children}</button>
@@ -243,14 +243,14 @@ export default function AdminPage() {
     <div style={{ ...pageBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 20px' }}>
       <style>{css}</style>
       <div style={{ marginBottom: 28 }}><Logo height={46} /></div>
-      <div style={{ width: '100%', maxWidth: 360, background: '#fff', borderRadius: 20, border: '1px solid #E0E6F4', padding: '30px 24px 26px', boxShadow: '0 8px 40px rgba(22,32,64,.1)' }}>
+      <div style={{ width: '100%', maxWidth: 360, background: '#FFFDF9', borderRadius: 20, border: '1px solid #E5DDD0', padding: '30px 24px 26px', boxShadow: '0 8px 40px rgba(22,32,64,.1)' }}>
         <div style={{ fontSize: 22, fontWeight: 800, color: NAVY, letterSpacing: -.5, marginBottom: 4 }}>Admin sign in</div>
-        <div style={{ fontSize: 14, color: '#8892AA', marginBottom: 24 }}>Access the Apex Tap Cards portal</div>
+        <div style={{ fontSize: 14, color: '#9E9488', marginBottom: 24 }}>Access the Apex Tap Cards portal</div>
         <form onSubmit={login} noValidate>
           <Label>Password</Label>
           <div style={{ position: 'relative', marginBottom: 14 }}>
             <input className="inp" style={{ ...inp, paddingRight: 60 }} type={showPw ? 'text' : 'password'} placeholder="Enter your password" value={pw} onChange={e => setPw(e.target.value)} autoFocus />
-            <button type="button" onClick={() => setShowPw(!showPw)} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 56, background: 'none', border: 'none', cursor: 'pointer', color: '#8892AA', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
+            <button type="button" onClick={() => setShowPw(!showPw)} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 56, background: 'none', border: 'none', cursor: 'pointer', color: '#9E9488', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
               {showPw ? 'Hide' : 'Show'}
             </button>
           </div>
@@ -265,10 +265,10 @@ export default function AdminPage() {
   if (addSt === 'success' && result) return (
     <div style={{ ...pageBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 20px' }}>
       <style>{css}</style>
-      <div style={{ width: '100%', maxWidth: 360, background: '#fff', borderRadius: 20, border: '1px solid #E0E6F4', padding: '32px 24px', boxShadow: '0 8px 40px rgba(22,32,64,.1)', textAlign: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 360, background: '#FFFDF9', borderRadius: 20, border: '1px solid #E5DDD0', padding: '32px 24px', boxShadow: '0 8px 40px rgba(22,32,64,.1)', textAlign: 'center' }}>
         <div style={{ width: 72, height: 72, borderRadius: '50%', background: GOLD_G, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, color: '#fff', margin: '0 auto 20px', boxShadow: '0 8px 28px rgba(184,150,46,.38)' }}>✓</div>
         <div style={{ fontSize: 22, fontWeight: 800, color: NAVY, letterSpacing: -.5, marginBottom: 6 }}>{bName} is live!</div>
-        <div style={{ fontSize: 14, color: '#8892AA', marginBottom: 22 }}>Program each NFC card with this URL</div>
+        <div style={{ fontSize: 14, color: '#9E9488', marginBottom: 22 }}>Program each NFC card with this URL</div>
         <div style={{ background: NAVY, borderRadius: 12, padding: '14px 16px', marginBottom: 20, fontFamily: 'monospace', fontSize: 13, color: GOLD, fontWeight: 700, wordBreak: 'break-all', lineHeight: 1.6, border: `1px solid rgba(184,150,46,.2)` }}>{result.cardUrl}</div>
         <GoldBtn onClick={copyUrl} style={{ marginBottom: 10, background: copied ? 'linear-gradient(135deg,#22C55E,#15803D)' : GOLD_G, boxShadow: copied ? '0 4px 18px rgba(34,197,94,.32)' : '0 4px 18px rgba(184,150,46,.32)' }}>
           {copied ? '✓  Copied!' : 'Copy URL'}
@@ -315,7 +315,7 @@ export default function AdminPage() {
                     <div key={i} className="dr" onMouseDown={e => { e.preventDefault(); pick(s) }} onTouchEnd={e => { e.preventDefault(); pick(s) }}
                       style={{ padding: '13px 16px', background: '#fff', borderBottom: i < sugs.length - 1 ? '1px solid #F0F3FA' : 'none', minHeight: 54, display: 'flex', flexDirection: 'column', justifyContent: 'center', cursor: 'pointer' }}>
                       <div style={{ fontSize: 15, fontWeight: 600, color: NAVY, lineHeight: 1.3 }}>{main}</div>
-                      {sec && <div style={{ fontSize: 12, color: '#8892AA', marginTop: 2, lineHeight: 1.3 }}>{sec}</div>}
+                      {sec && <div style={{ fontSize: 12, color: '#9E9488', marginTop: 2, lineHeight: 1.3 }}>{sec}</div>}
                     </div>
                   )
                 })}
@@ -326,8 +326,8 @@ export default function AdminPage() {
 
         {/* Status */}
         {pSt === 'checking' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#fff', border: '1px solid #E4E9F4', borderRadius: 12, padding: '12px 16px', marginBottom: 12, fontSize: 14, color: '#8892AA' }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#C8D0E4', flexShrink: 0 }} /> Checking status...
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#fff', border: '1px solid #E5DDD0', borderRadius: 12, padding: '12px 16px', marginBottom: 12, fontSize: 14, color: '#9E9488' }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#CEC3B5', flexShrink: 0 }} /> Checking status...
           </div>
         )}
         {pSt === 'new' && (
@@ -354,14 +354,14 @@ export default function AdminPage() {
             <Label>Log This Visit</Label>
             <input className="inp" style={{ ...inp, marginBottom: 8 }} type="text" placeholder="Your name" value={rep} onChange={e => setRep(e.target.value)} />
             <div style={{ position: 'relative', marginBottom: 12 }}>
-              <select className="inp" style={{ ...inp, paddingRight: 36, cursor: 'pointer', color: outcome ? NAVY : '#A0AABF' }} value={outcome} onChange={e => setOutcome(e.target.value)}>
+              <select className="inp" style={{ ...inp, paddingRight: 36, cursor: 'pointer', color: outcome ? NAVY : '#B5A898' }} value={outcome} onChange={e => setOutcome(e.target.value)}>
                 <option value="">Select outcome...</option>
                 <option value="pitched">Pitched — Awaiting Decision</option>
                 <option value="not_interested">Not Interested</option>
                 <option value="follow_up">Follow-Up Scheduled</option>
                 <option value="sold">Sold ✓</option>
               </select>
-              <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#A0AABF', fontSize: 10 }}>▼</span>
+              <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#B5A898', fontSize: 10 }}>▼</span>
             </div>
             <OutlineBtn onClick={logVisit} disabled={!rep.trim() || !outcome || logSt === 'loading'}>
               {logSt === 'loading' ? 'Logging...' : 'Log Visit'}
